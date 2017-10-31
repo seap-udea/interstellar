@@ -68,6 +68,7 @@ http://naif.jpl.nasa.gov/pub/naif/
 #define YEAR (365.25*GSL_CONST_MKSA_DAY)
 #define DAY GSL_CONST_MKSA_DAY
 #define AU GSL_CONST_MKSA_ASTRONOMICAL_UNIT
+#define PARSEC GSL_CONST_MKSA_PARSEC
 #define VESC_EARTH 11.217 //km/s
 //////////////////////////////////////////
 //BEHAVIOR
@@ -142,6 +143,7 @@ static double GMASSES[]={
   5794548.600000/*URANUS*/,
   6836535.000000/*NEPTUNE*/
 };
+double MUTOT;
 
 //DE431
 // static double GMASSES[]={
@@ -173,6 +175,7 @@ static double RADII[]={
   6836535.000000/*NEPTUNE*/
 };
 
+#include <objects.hpp>
 
 struct ObserverStruct{
 
@@ -244,6 +247,13 @@ int initSpice(void)
   for(i=0;i<10;i++){
     bodvrd_c(LABELS[i],"RADII",3,&n,radii);
     RADII[i]=radii[0];
+  }
+
+  //TOTAL MU
+  MUTOT=0.0;
+  for(i=NUMOBJS;i-->0;){
+    if(!ACTIVE[i]) continue;
+    MUTOT+=GMASSES[i];
   }
 
   //RANDOM NUMBERS
@@ -669,14 +679,14 @@ double energy2B(double X[])
   return E;
 }
 
-#include <objects.hpp>
-
 FILE *FDEBUG;
 int EoM(double t,double y[],double dydt[],void *params) 
 { 
   //COMPUTE THE CONTRIBUTION OF EVERY OBJECT
   int i;
   double r,object[6],R[3],Rmag,tmp,GM,fac;
+  double ab;
+  int* ps=(int*)params;
   fprintf(FDEBUG,"t=%.17e\n",t);
   
   fac=UT*UT/(UL/1E3*UL/1E3*UL/1E3);
@@ -700,17 +710,13 @@ int EoM(double t,double y[],double dydt[],void *params)
       throw(1);
     }else{
       GM=GMASSES[i]*fac;
-      /*
-      if(i==3){
-	fprintf(stdout,"t=%e, i = %d, R = %e\n",t,i,Rmag);
-	getc(stdin);
+      ab=-GM/(Rmag*Rmag*Rmag);
+      if(ps[1]==1){
+	fprintf(stdout,"\t\tAcceleration body %d: %.17e\n",i,ab);
       }
-      */
-      sumVec(dydt+3,1.0,dydt+3,-GM/(Rmag*Rmag*Rmag),R,3);
+      sumVec(dydt+3,1.0,dydt+3,ab,R,3);
     }
   }
-  //printf("Forces at t = %.17e:%s\n",t,vec2str(dydt+3,"%.17e "));
-  //exit(0);
   return 0;
 }
 

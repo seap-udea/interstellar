@@ -13,6 +13,10 @@ int main(int argc,char* argv[])
   //INITIAL CONDITIONS
   ////////////////////////////////////////////////////
 #include <initials.hpp>
+
+  ////////////////////////////////////////////////////
+  //COMPUTE GALACTIC TIDAL FORCE
+  ////////////////////////////////////////////////////
   
   ////////////////////////////////////////////////////
   //INITIAL POSITIONS
@@ -64,14 +68,26 @@ int main(int argc,char* argv[])
   fprintf(stdout,"\tRA(+HH:MM:SS) = %s, DEC(DD:MM:SS) = %s\n",dec2sex(RA*RAD/15.0),dec2sex(DEC*RAD));
 
   ////////////////////////////////////////////////////
-  //BACKWARD INTEGRATION
+  //CONVERSION TO GALACTIC COORDINATES
   ////////////////////////////////////////////////////
-  fprintf(stdout,"Final conditions:\n");
+  double posGalactic[6];
+  double lam,phi;
+  pxform_c("ECLIPJ2000","GALACTIC",to,M);
+  mxv_c(M,position,posGalactic);
+  recrad_c(posGalactic,&d,&lam,&phi);
+  fprintf(stdout,"\tD = %.5f AU\n",d*1e3/AU);
+  fprintf(stdout,"\tz (galactic) = %.5f AU\n",posGalactic[2]*1e3/AU);
+  fprintf(stdout,"\tLong.(+DD:MM:SS) = %s, Lat.(DD:MM:SS) = %s\n",dec2sex(lam*RAD),dec2sex(phi*RAD));
+
+  ////////////////////////////////////////////////////
+  //INITIAL CONDITIONS FOR INTEGRATION
+  ////////////////////////////////////////////////////
   int npoints=2;
   double tini=to;
-  double duration=-50.0*365.25*GSL_CONST_MKSA_DAY;
+  double duration=-100.0*365.25*GSL_CONST_MKSA_DAY;
   double direction=duration/fabs(duration);
-  double params[]={6};
+  double params[]={6,0};
+  int eparams[]={6,1};
   
   //UNITS
   UL=GSL_CONST_MKSA_ASTRONOMICAL_UNIT;
@@ -98,7 +114,52 @@ int main(int argc,char* argv[])
   double t_stop=tend;
   double t=t_start;
 
+  ////////////////////////////////////////////////////
+  //COMPUTE SOLAR SYSTEM FORCES
+  ////////////////////////////////////////////////////
+  double dydt[6],uF[3],F,ur[3],r;
+  EoM(t_start,X0,dydt,eparams);
+  unorm_c(X0,ur,&r);
+  fprintf(stdout,"\tSolar direction : %s, r = %.17e\n",
+	  vec2strn(ur,3,"%.17e "),r);
+  unorm_c(dydt+3,uF,&F);
+  fprintf(stdout,"\tForces : %s\n",
+	  vec2strn(dydt+3,3,"%.17e "));
+  fprintf(stdout,"\tForce direction : %s, F = %.17e\n",
+	  vec2strn(uF,3,"%.17e "),F);
+
+  ////////////////////////////////////////////////////
+  //GALACTIC TIDAL FORCE
+  ////////////////////////////////////////////////////
+  double rhodisk=0.10*MSUN/(PARSEC*PARSEC*PARSEC);
+  double zdisk,adisk;
+  zdisk=posGalactic[2]*1e3;
+  adisk=-4*M_PI*GCONST*rhodisk*zdisk;
+  adisk=adisk/(UL/(UT*UT));
+  fprintf(stdout,"\trhodisk = %.17e\n",rhodisk);
+  fprintf(stdout,"\tadisk = %.17e\n",adisk);
+
+  ////////////////////////////////////////////////////
+  //COMPUTE SOLAR SYSTEM BARYCENTER ORBITAL ELEMENTS
+  ////////////////////////////////////////////////////
+  double elts[8];
+  vscl_c(UL/1E3,X0,Xu);vscl_c(UV/1E3,X0+3,Xu+3);
+  oscelt_c(Xu,t*UT,MUTOT,elts);
+  fprintf(stdout,"\tOrbital elements :\n");
+  fprintf(stdout,"\t\tq = %.17e\n",elts[0]*1E3/AU); 
+  fprintf(stdout,"\t\te = %.17e\n",elts[1]); 
+  fprintf(stdout,"\t\ti = %.17e\n",elts[2]*RAD); 
+  fprintf(stdout,"\t\tW = %.17e\n",elts[3]*RAD); 
+  fprintf(stdout,"\t\tw = %.17e\n",elts[4]*RAD); 
+  fprintf(stdout,"\t\tM = %.17e\n",elts[5]*RAD); 
+  fprintf(stdout,"\t\tto = %.17e\n",elts[6]); 
+  fprintf(stdout,"\t\tmu = %.17e\n",elts[7]); 
+  
+  ////////////////////////////////////////////////////
+  //BACKWARD INTEGRATION
+  ////////////////////////////////////////////////////
   //INTEGRATION
+  fprintf(stdout,"Final conditions:\n");
   int i,status;
   h_used=h;
   for(i=0;i<npoints;i++) {
@@ -144,11 +205,71 @@ int main(int argc,char* argv[])
 	  vec2strn(Xu+3,3,"%.17e "));
 
   ////////////////////////////////////////////////////
+  //FORCES
+  ////////////////////////////////////////////////////
+  EoM(t_start,X0,dydt,eparams);
+  unorm_c(X0,ur,&r);
+  fprintf(stdout,"\tSolar direction : %s, r = %.17e\n",
+	  vec2strn(ur,3,"%.17e "),r);
+  unorm_c(dydt+3,uF,&F);
+  fprintf(stdout,"\tForces : %s\n",
+	  vec2strn(dydt+3,3,"%.17e "));
+  fprintf(stdout,"\tForce direction : %s, F = %.17e\n",
+	  vec2strn(uF,3,"%.17e "),F);
+  
+  ////////////////////////////////////////////////////
+  //COMPUTE SOLAR SYSTEM BARYCENTER ORBITAL ELEMENTS
+  ////////////////////////////////////////////////////
+  oscelt_c(Xu,te,MUTOT,elts);
+  fprintf(stdout,"\tOrbital elements @ SSB :\n");
+  fprintf(stdout,"\t\tq = %.17e\n",elts[0]*1E3/AU); 
+  fprintf(stdout,"\t\te = %.17e\n",elts[1]); 
+  fprintf(stdout,"\t\ti = %.17e\n",elts[2]*RAD); 
+  fprintf(stdout,"\t\tW = %.17e\n",elts[3]*RAD); 
+  fprintf(stdout,"\t\tw = %.17e\n",elts[4]*RAD); 
+  fprintf(stdout,"\t\tM = %.17e\n",elts[5]*RAD); 
+  fprintf(stdout,"\t\tto = %.17e\n",elts[6]); 
+  fprintf(stdout,"\t\tmu = %.17e\n",elts[7]); 
+
+  ////////////////////////////////////////////////////
+  //PREDICT FUTURE POSITION USING THE ASYMPTOTIC EL.
+  ////////////////////////////////////////////////////
+  double tfut=to-100*YEAR;
+  //double tfut=to+duration;
+  conics_c(elts,tfut,position);
+  fprintf(stdout,"\t\tto - tfut= %.17e\n",elts[6]-tfut); 
+  fprintf(stdout,"\tFuture position @ SSB (EJ2000), t = %.17e : %s\n",
+	  tfut,vec2strn(position,3,"%.17e "));
+  fprintf(stdout,"\tFuture velocity @ SSB (EJ2000), t = %.17e : %s\n",
+	  tfut,vec2strn(position+3,3,"%.17e "));
+
+  ////////////////////////////////////////////////////
   //CONVERSION TO J2000 COORDINATES
   ////////////////////////////////////////////////////
   pxform_c("ECLIPJ2000","J2000",to,M);
   mxv_c(M,Xu,posJ2000);
   recrad_c(posJ2000,&d,&RA,&DEC);
   fprintf(stdout,"\tD = %.5f AU\n",d*1e3/AU);
+  fprintf(stdout,"\tz = %.5f AU\n",Xu[2]*1e3/AU);
   fprintf(stdout,"\tRA(+HH:MM:SS) = %s, DEC(DD:MM:SS) = %s\n",dec2sex(RA*RAD/15.0),dec2sex(DEC*RAD));
+
+  ////////////////////////////////////////////////////
+  //CONVERSION TO GALACTIC COORDINATES
+  ////////////////////////////////////////////////////
+  pxform_c("ECLIPJ2000","GALACTIC",to,M);
+  mxv_c(M,position,posGalactic);
+  recrad_c(posGalactic,&d,&lam,&phi);
+  fprintf(stdout,"\tD = %.5f AU\n",d*1e3/AU);
+  fprintf(stdout,"\tz (galactic) = %.5f AU\n",posGalactic[2]*1e3/AU);
+  fprintf(stdout,"\tLong.(+DD:MM:SS) = %s, Lat.(DD:MM:SS) = %s\n",dec2sex(lam*RAD),dec2sex(phi*RAD));
+
+  ////////////////////////////////////////////////////
+  //GALACTIC TIDAL FORCE
+  ////////////////////////////////////////////////////
+  zdisk=posGalactic[2]*1e3;
+  adisk=-4*M_PI*GCONST*rhodisk*zdisk;
+  adisk=adisk/(UL/(UT*UT));
+  fprintf(stdout,"\trhodisk = %.17e\n",rhodisk);
+  fprintf(stdout,"\tadisk = %.17e\n",adisk);
+
 }
