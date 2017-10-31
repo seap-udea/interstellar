@@ -37,7 +37,6 @@ int main(int argc,char* argv[])
   SpiceDouble M_Eclip_J2000[3][3],M_Eclip_Galactic[3][3];
   SpiceDouble posJ2000[6],RA,DEC,d;
   SpiceDouble posGalactic[6],l,b;
-
   //INTEGRATION
   int npoints=2;
   double tini=to;
@@ -50,10 +49,13 @@ int main(int argc,char* argv[])
   int i,status;
   //INITIAL CONDITIONS
   double X0[6],X[6],Xu[6],as,tdyn;
+  //ELEMENTS
+  double elts[8];
 
   ////////////////////////////////////////////////////
   //LOOP OVER PARTICLES
   ////////////////////////////////////////////////////
+  FILE* fc=fopen("cloud.data","w");
   int Npart=10;
   int j;
   for(j=0;j<Npart;j++){
@@ -63,7 +65,7 @@ int main(int argc,char* argv[])
     //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
     //GENERATE INITIAL ELEMENTS
     //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-    double fac=0.0;
+    double fac=1.0;
     //q
     q=ini_q+gsl_ran_gaussian(RAND,ini_dq*fac);
     fprintf(stdout,"\tq = %.17e (mean = %.17e, sigma = %.17e)\n",q,ini_q,ini_dq);
@@ -151,12 +153,16 @@ int main(int argc,char* argv[])
     //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
     vscl_c(UL/1E3,X0,Xu);vscl_c(UV/1E3,X0+3,Xu+3);
 
+    //ASYMPTOTIC ELEMENTS
+    oscelt_c(Xu,t,MUTOT,elts);
+    
     //J2000
     pxform_c("ECLIPJ2000","J2000",to,M_Eclip_J2000);
     mxv_c(M_Eclip_J2000,Xu,posJ2000);
     recrad_c(posJ2000,&d,&RA,&DEC);
     fprintf(stdout,"\tRA(+HH:MM:SS) = %s, DEC(DD:MM:SS) = %s\n",
 	    dec2sex(RA*RAD/15.0),dec2sex(DEC*RAD));
+
     //GALACTIC
     pxform_c("ECLIPJ2000","GALACTIC",to,M_Eclip_Galactic);
     mxv_c(M_Eclip_Galactic,Xu,posGalactic);
@@ -164,6 +170,23 @@ int main(int argc,char* argv[])
     fprintf(stdout,"\tl(+DD:MM:SS) = %s, b(DD:MM:SS) = %s\n",
 	    dec2sex(l*RAD),dec2sex(b*RAD));
 
-    break;
+    //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+    //SAVE POSITION
+    //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+    //PARTICLE TEND
+    fprintf(fc,"%-10d %-27.17e ",j,tend);
+    //POSITION ECLIPJ2000
+    fprintf(fc,"%s ",vec2strn(Xu,6,"%.17e "));
+    //POSITION J2000
+    fprintf(fc,"%s ",vec2strn(posJ2000,3,"%.17e "));
+    //POSITION ECLIPTIC
+    fprintf(fc,"%s ",vec2strn(posGalactic,3,"%.17e "));
+    //J2000
+    fprintf(fc,"%-27.17e %-27.17e ",RA*RAD/15.0,DEC*RAD);
+    //GALACTIC
+    fprintf(fc,"%-27.17e %-27.17e ",l*RAD,b*RAD);
+    fprintf(fc,"\n");
+
   }
+  fclose(fc);
 }
