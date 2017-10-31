@@ -57,6 +57,8 @@ int main(int argc,char* argv[])
   spkezr_c("301",et+365.25*DAY,"ECLIPJ2000","NONE",SSB,position,&ltmp);
   */
 
+  spkezr_c("8",et,"ECLIPJ2000","NONE",SSB,sun,&ltmp);
+
   //COMET
   spkezr_c("SUN",et,"ECLIPJ2000","NONE",SSB,sun,&ltmp);
   fprintf(stdout,"Sun = %s\n",vec2strn(sun,6,"%.17e "));

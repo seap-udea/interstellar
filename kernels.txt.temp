@@ -2,7 +2,8 @@
 
 PATH_VALUES = ( 'util/kernels' )
 PATH_SYMBOLS = ( 'PATH' )
-KERNELS_TO_LOAD = ('$PATH/de430.bsp',
+KERNELS_TO_LOAD = ('$PATH/de431_part-1.bsp',
+		   '$PATH/de431_part-2.bsp',
 		   '$PATH/naif0011.tls',
 		   '$PATH/pck00010.tpc',
 		   '$PATH/earth_720101_070426.bpc',

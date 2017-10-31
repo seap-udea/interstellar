@@ -129,6 +129,7 @@ static double MASSES[]={
   Source: documentation DE421
   http://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/a_old_versions/de421_announcement.pdf
  */
+//DE421
 static double GMASSES[]={
   132712440040.944000/*SUN*/,
   22032.090000/*MERCURY*/,
@@ -141,6 +142,20 @@ static double GMASSES[]={
   5794548.600000/*URANUS*/,
   6836535.000000/*NEPTUNE*/
 };
+
+//DE431
+// static double GMASSES[]={
+//   132712440040.944000/*SUN*/,
+//   22032.090000/*MERCURY*/,
+//   324858.592000/*VENUS*/,
+//   398600.436233/*EARTH*/,
+//   4902.800076/*MOON*/,
+//   42828.375214/*MARS*/,
+//   126712764.800000/*JUPITER*/,
+//   37940585.200000/*SATURN*/,
+//   5794548.600000/*URANUS*/,
+//   6836535.000000/*NEPTUNE*/
+// };
 
 /*
   Gotten from kernes DE430
