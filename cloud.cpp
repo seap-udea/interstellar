@@ -62,10 +62,12 @@ int main(int argc,char* argv[])
   ////////////////////////////////////////////////////
   FILE* fc=fopen("cloud.data","w");
   int Npart=10;
+  int Nfreq=ceil(Npart/10);
   int j;
   for(j=0;j<Npart;j++){
 
-    fprintf(stdout,"Particle %d...\n",j+1);
+    if ((j%Nfreq)==0)
+      fprintf(stdout,"Particle %d...\n",j+1);
 
     //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
     //GENERATE INITIAL ELEMENTS
