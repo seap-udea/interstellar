@@ -1,0 +1,20 @@
+Function: 
+
+  Calculate position of a given geographical site on Earth with
+  respect to apex direction.
+
+Arguments are: 
+
+   [ET] date lat. lon. [h Az vimp]
+
+Date format:
+
+   MM/DD/CCYY HH:MM:SS.dcm UTC-L
+
+   If ET is used the date should be provided as ephemeris time.
+
+Example:
+
+   ./whereisapex.exe "02/15/2013 03:20:34 UTC" 6.2 -75.34
+   ./whereisapex.exe "02/15/2013 03:20:34 UTC" 6.2 -75.34 90.0 0.0 20.0
+   ./whereisapex.exe ET 4.141704340e+08 6.2 -75.34

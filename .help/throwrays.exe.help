@@ -1,0 +1,19 @@
+
+Function: 
+
+  Launch rays rom a given location on Earth and compute their
+  terminal place in the orbital configuration space.
+
+Arguments are: 
+
+  ephemeris initial time (in TDB seconds), latitude (degrees),
+  longitude (degrees), elevation (meters), file with topocentric
+  initial conditions (azimuth, elevation and velocities), use velicity
+  depending on qapex?, file to store results
+
+Example:
+
+  ./throwrays.exe 4.141704340e+08 54.456093 63.492323 8.234765e+04 locals.dat.temp 1 elements.dat
+
+  These are the initial conditions for the Chelyabinsk
+  meteoroid. If everything is correct the result will be:

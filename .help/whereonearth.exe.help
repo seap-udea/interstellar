@@ -1,0 +1,18 @@
+Function: 
+
+  Calculate
+
+Arguments are: 
+
+  [ET] date
+
+Date format:
+
+   MM/DD/CCYY HH:MM:SS.dcm UTC-L
+
+   If ET is used the date should be provided as ephemeris time.
+
+Example:
+
+   ./whereonearth.exe "02/15/2013 03:20:34 UTC"
+   ./whereonearth.exe ET 4.141704340e+08
