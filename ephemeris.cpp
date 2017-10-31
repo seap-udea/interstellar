@@ -36,6 +36,7 @@ int main(int argc,char* argv[])
   double M=31.28328035977056,dM=0.27399;//deg
   double tp=2458005.972892582579;
   double n=0.6723667577077285,dn=0.0060718;//deg/d
+
   str2et_c("10/26/2017 00:00:00.000",&et);
   deltet_c(et,"et",&dt);
   tdb=et-dt;
@@ -75,7 +76,7 @@ int main(int argc,char* argv[])
   //VELOCITY
   fprintf(stdout,"v = %.17e\n",vnorm_c(position+3));
 
-  et+=100*365.25*DAY;
+  et-=400*365.25*DAY;
   deltet_c(et,"et",&dt);
 
   SpiceChar utc[100];
