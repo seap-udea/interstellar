@@ -41,7 +41,8 @@ int main(int argc,char* argv[])
   SpiceDouble M_Eclip_J2000[3][3],M_Eclip_Galactic[3][3];
   SpiceDouble posJ2000[6],RA,DEC,d;
   SpiceDouble posGalactic[6],l,b;
-  SpiceDouble posFuture[6],RAfut,DECfut,lfut,bfut,dfut;
+  SpiceDouble posFutureJ2000[6],posFuture[6],posFutureGalactic[6];
+  double RAfut,DECfut,lfut,bfut,dfut;
   //INTEGRATION
   int npoints=2;
   double tini=to;
@@ -170,6 +171,7 @@ int main(int argc,char* argv[])
     //J2000
     pxform_c("ECLIPJ2000","J2000",t,M_Eclip_J2000);
     mxv_c(M_Eclip_J2000,Xu,posJ2000);
+    mxv_c(M_Eclip_J2000,Xu+3,posJ2000+3);
     recrad_c(posJ2000,&d,&RA,&DEC);
     if(VERBOSE) fprintf(stdout,"\tRA(+HH:MM:SS) = %s, DEC(DD:MM:SS) = %s, d = %.3lf AU\n",
 	    dec2sex(RA*RAD/15.0),dec2sex(DEC*RAD),d*1e3/AU);
@@ -177,6 +179,7 @@ int main(int argc,char* argv[])
     //GALACTIC
     pxform_c("ECLIPJ2000","GALACTIC",t,M_Eclip_Galactic);
     mxv_c(M_Eclip_Galactic,Xu,posGalactic);
+    mxv_c(M_Eclip_Galactic,Xu+3,posGalactic+3);
     recrad_c(posGalactic,&d,&l,&b);
     if(VERBOSE) fprintf(stdout,"\tl(+DD:MM:SS) = %s, b(DD:MM:SS) = %s\n",
 	    dec2sex(l*RAD),dec2sex(b*RAD));
@@ -186,19 +189,20 @@ int main(int argc,char* argv[])
     //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
     conics_c(elts,tfut,posFuture);
     if(VERBOSE) fprintf(stdout,"\tDistant future position : %s\n",
-	    vec2strn(posFuture,3,"%.17e "));
+			vec2strn(posFuture,3,"%.17e "));
 
     //J2000
     pxform_c("ECLIPJ2000","J2000",tfut,M_Eclip_J2000);
-    mxv_c(M_Eclip_J2000,posFuture,posJ2000);
-    recrad_c(posJ2000,&dfut,&RAfut,&DECfut);
+    mxv_c(M_Eclip_J2000,posFuture,posFutureJ2000);
+    recrad_c(posFutureJ2000,&dfut,&RAfut,&DECfut);
     if(VERBOSE) fprintf(stdout,"\tFuture: RA(+HH:MM:SS) = %s, DEC(DD:MM:SS) = %s, d = %.3lf pc\n",
 	    dec2sex(RAfut*RAD/15.0),dec2sex(DECfut*RAD),dfut*1e3/PARSEC);
 
     //GALACTIC
     pxform_c("ECLIPJ2000","GALACTIC",tfut,M_Eclip_Galactic);
-    mxv_c(M_Eclip_Galactic,posFuture,posGalactic);
-    recrad_c(posGalactic,&dfut,&lfut,&bfut);
+    mxv_c(M_Eclip_Galactic,posFuture,posFutureGalactic);
+    mxv_c(M_Eclip_Galactic,posFuture+3,posFutureGalactic+3);
+    recrad_c(posFutureGalactic,&dfut,&lfut,&bfut);
     if(VERBOSE) fprintf(stdout,"\tFuture: l(+DD:MM:SS) = %s, b(DD:MM:SS) = %s\n",
 	    dec2sex(lfut*RAD),dec2sex(bfut*RAD));
 
@@ -206,13 +210,13 @@ int main(int argc,char* argv[])
     //SAVE POSITION
     //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
     //PARTICLE TEND
-    fprintf(fc,"%-10d %-27.17e ",j,tend);
+    fprintf(fc,"%-10d %-27.17e %-27.17e",j,tend*UT,tfut);
     //POSITION ECLIPJ2000
     fprintf(fc,"%s ",vec2strn(Xu,6,"%.17e "));
     //POSITION J2000
-    fprintf(fc,"%s ",vec2strn(posJ2000,3,"%.17e "));
+    fprintf(fc,"%s ",vec2strn(posJ2000,6,"%.17e "));
     //POSITION GALACTIC
-    fprintf(fc,"%s ",vec2strn(posGalactic,3,"%.17e "));
+    fprintf(fc,"%s ",vec2strn(posGalactic,6,"%.17e "));
     //J2000
     fprintf(fc,"%-27.17e %-27.17e ",RA*RAD/15.0,DEC*RAD);
     //GALACTIC
@@ -223,6 +227,8 @@ int main(int argc,char* argv[])
     fprintf(fc,"%s ",vec2strn(elts,8,"%.17e "));
     //DISTANT FUTURE
     fprintf(fc,"%s ",vec2strn(posFuture,6,"%.17e "));
+    //DISTANT FUTURE
+    fprintf(fc,"%s ",vec2strn(posFutureGalactic,6,"%.17e "));
     //J2000
     fprintf(fc,"%-27.17e %-27.17e ",RAfut*RAD/15.0,DECfut*RAD);
     //GALACTIC
