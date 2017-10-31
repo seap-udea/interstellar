@@ -61,7 +61,7 @@ int main(int argc,char* argv[])
   //LOOP OVER PARTICLES
   ////////////////////////////////////////////////////
   FILE* fc=fopen("cloud.data","w");
-  int Npart=10;
+  int Npart=50;
   int Nfreq=ceil(Npart/10);
   int j;
   for(j=0;j<Npart;j++){
