@@ -1,6 +1,8 @@
 #include <gravray.cpp>
 using namespace std;
 
+#define VERBOSE 0
+
 int main(int argc,char* argv[])
 {
   ////////////////////////////////////////////////////
@@ -37,6 +39,7 @@ int main(int argc,char* argv[])
   SpiceDouble M_Eclip_J2000[3][3],M_Eclip_Galactic[3][3];
   SpiceDouble posJ2000[6],RA,DEC,d;
   SpiceDouble posGalactic[6],l,b;
+  SpiceDouble posFuture[6],RAfut,DECfut,lfut,bfut,dfut;
   //INTEGRATION
   int npoints=2;
   double tini=to;
@@ -51,6 +54,8 @@ int main(int argc,char* argv[])
   double X0[6],X[6],Xu[6],as,tdyn;
   //ELEMENTS
   double elts[8];
+  //FUTURE
+  double tfut=to-5e5*YEAR;
 
   ////////////////////////////////////////////////////
   //LOOP OVER PARTICLES
@@ -60,7 +65,7 @@ int main(int argc,char* argv[])
   int j;
   for(j=0;j<Npart;j++){
 
-    fprintf(stdout,"Particle %d:\n",j+1);
+    fprintf(stdout,"Particle %d...\n",j+1);
 
     //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
     //GENERATE INITIAL ELEMENTS
@@ -68,38 +73,38 @@ int main(int argc,char* argv[])
     double fac=1.0;
     //q
     q=ini_q+gsl_ran_gaussian(RAND,ini_dq*fac);
-    fprintf(stdout,"\tq = %.17e (mean = %.17e, sigma = %.17e)\n",q,ini_q,ini_dq);
+    if(VERBOSE) fprintf(stdout,"\tq = %.17e (mean = %.17e, sigma = %.17e)\n",q,ini_q,ini_dq);
     //e
     e=ini_e+gsl_ran_gaussian(RAND,ini_de*fac);
-    fprintf(stdout,"\te = %.17e (mean = %.17e, sigma = %.17e)\n",e,ini_e,ini_de);
+    if(VERBOSE) fprintf(stdout,"\te = %.17e (mean = %.17e, sigma = %.17e)\n",e,ini_e,ini_de);
     //i
     inc=ini_i+gsl_ran_gaussian(RAND,ini_di*fac);
-    fprintf(stdout,"\ti = %.17e (mean = %.17e, sigma = %.17e)\n",inc,ini_i,ini_di);
+    if(VERBOSE) fprintf(stdout,"\ti = %.17e (mean = %.17e, sigma = %.17e)\n",inc,ini_i,ini_di);
     //W
     W=ini_W+gsl_ran_gaussian(RAND,ini_dW*fac);
-    fprintf(stdout,"\tW = %.17e (mean = %.17e, sigma = %.17e)\n",W,ini_W,ini_dW);
+    if(VERBOSE) fprintf(stdout,"\tW = %.17e (mean = %.17e, sigma = %.17e)\n",W,ini_W,ini_dW);
     //w
     w=ini_w+gsl_ran_gaussian(RAND,ini_dw*fac);
-    fprintf(stdout,"\tw = %.17e (mean = %.17e, sigma = %.17e)\n",w,ini_w,ini_dw);
+    if(VERBOSE) fprintf(stdout,"\tw = %.17e (mean = %.17e, sigma = %.17e)\n",w,ini_w,ini_dw);
     //Mo
     Mo=ini_M+gsl_ran_gaussian(RAND,ini_dM*fac);
-    fprintf(stdout,"\tM = %.17e (mean = %.17e, sigma = %.17e)\n",Mo,ini_M,ini_dM); 
+    if(VERBOSE) fprintf(stdout,"\tM = %.17e (mean = %.17e, sigma = %.17e)\n",Mo,ini_M,ini_dM); 
     SpiceDouble elements[]={q*AU/1e3,e,inc*DEG,W*DEG,w*DEG,Mo*DEG,to,mu};
 
     //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
     //INITIAL POSITION @ SSB
     //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
     conics_c(elements,to,position);
-    fprintf(stdout,"\tInitial position @ Sun (EJ2000) : %s\n",
+    if(VERBOSE) fprintf(stdout,"\tInitial position @ Sun (EJ2000) : %s\n",
 	    vec2strn(position,3,"%.17e "));
-    fprintf(stdout,"\tInitial velocity @ Sun (EJ2000) : %s\n",
+    if(VERBOSE) fprintf(stdout,"\tInitial velocity @ Sun (EJ2000) : %s\n",
 	    vec2strn(position+3,3,"%.17e "));
 
     spkezr_c("SUN",to,"ECLIPJ2000","NONE",SSB,sun,&ltmp);
     vaddg_c(position,sun,6,position);
-    fprintf(stdout,"\tInitial position @ SSB (EJ2000) : %s\n",
+    if(VERBOSE) fprintf(stdout,"\tInitial position @ SSB (EJ2000) : %s\n",
 	    vec2strn(position,3,"%.17e "));
-    fprintf(stdout,"\tInitial velocity @ SSB (EJ2000) : %s\n",
+    if(VERBOSE) fprintf(stdout,"\tInitial velocity @ SSB (EJ2000) : %s\n",
 	    vec2strn(position+3,3,"%.17e "));
 
     //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
@@ -152,23 +157,46 @@ int main(int argc,char* argv[])
     //FINAL POSITION
     //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
     vscl_c(UL/1E3,X0,Xu);vscl_c(UV/1E3,X0+3,Xu+3);
+    if(VERBOSE) fprintf(stdout,"\tFinal position : %s\n",
+	    vec2strn(Xu,3,"%.17e "));
 
     //ASYMPTOTIC ELEMENTS
     oscelt_c(Xu,t,MUTOT,elts);
     
     //J2000
-    pxform_c("ECLIPJ2000","J2000",to,M_Eclip_J2000);
+    pxform_c("ECLIPJ2000","J2000",t,M_Eclip_J2000);
     mxv_c(M_Eclip_J2000,Xu,posJ2000);
     recrad_c(posJ2000,&d,&RA,&DEC);
-    fprintf(stdout,"\tRA(+HH:MM:SS) = %s, DEC(DD:MM:SS) = %s\n",
-	    dec2sex(RA*RAD/15.0),dec2sex(DEC*RAD));
+    if(VERBOSE) fprintf(stdout,"\tRA(+HH:MM:SS) = %s, DEC(DD:MM:SS) = %s, d = %.3lf AU\n",
+	    dec2sex(RA*RAD/15.0),dec2sex(DEC*RAD),d*1e3/AU);
 
     //GALACTIC
-    pxform_c("ECLIPJ2000","GALACTIC",to,M_Eclip_Galactic);
+    pxform_c("ECLIPJ2000","GALACTIC",t,M_Eclip_Galactic);
     mxv_c(M_Eclip_Galactic,Xu,posGalactic);
     recrad_c(posGalactic,&d,&l,&b);
-    fprintf(stdout,"\tl(+DD:MM:SS) = %s, b(DD:MM:SS) = %s\n",
+    if(VERBOSE) fprintf(stdout,"\tl(+DD:MM:SS) = %s, b(DD:MM:SS) = %s\n",
 	    dec2sex(l*RAD),dec2sex(b*RAD));
+
+    //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+    //POSITION IN THE DISTANT FUTURE
+    //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+    conics_c(elts,tfut,posFuture);
+    if(VERBOSE) fprintf(stdout,"\tDistant future position : %s\n",
+	    vec2strn(posFuture,3,"%.17e "));
+
+    //J2000
+    pxform_c("ECLIPJ2000","J2000",tfut,M_Eclip_J2000);
+    mxv_c(M_Eclip_J2000,posFuture,posJ2000);
+    recrad_c(posJ2000,&dfut,&RAfut,&DECfut);
+    if(VERBOSE) fprintf(stdout,"\tFuture: RA(+HH:MM:SS) = %s, DEC(DD:MM:SS) = %s, d = %.3lf pc\n",
+	    dec2sex(RAfut*RAD/15.0),dec2sex(DECfut*RAD),dfut*1e3/PARSEC);
+
+    //GALACTIC
+    pxform_c("ECLIPJ2000","GALACTIC",tfut,M_Eclip_Galactic);
+    mxv_c(M_Eclip_Galactic,posFuture,posGalactic);
+    recrad_c(posGalactic,&dfut,&lfut,&bfut);
+    if(VERBOSE) fprintf(stdout,"\tFuture: l(+DD:MM:SS) = %s, b(DD:MM:SS) = %s\n",
+	    dec2sex(lfut*RAD),dec2sex(bfut*RAD));
 
     //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
     //SAVE POSITION
@@ -179,14 +207,22 @@ int main(int argc,char* argv[])
     fprintf(fc,"%s ",vec2strn(Xu,6,"%.17e "));
     //POSITION J2000
     fprintf(fc,"%s ",vec2strn(posJ2000,3,"%.17e "));
-    //POSITION ECLIPTIC
+    //POSITION GALACTIC
     fprintf(fc,"%s ",vec2strn(posGalactic,3,"%.17e "));
     //J2000
     fprintf(fc,"%-27.17e %-27.17e ",RA*RAD/15.0,DEC*RAD);
     //GALACTIC
     fprintf(fc,"%-27.17e %-27.17e ",l*RAD,b*RAD);
+    //ASYMPTOTIC ELEMENTS
+    fprintf(fc,"%s ",vec2strn(elts,8,"%.17e "));
+    //DISTANT FUTURE
+    fprintf(fc,"%s ",vec2strn(posFuture,8,"%.17e "));
+    //J2000
+    fprintf(fc,"%-27.17e %-27.17e ",RAfut*RAD/15.0,DECfut*RAD);
+    //GALACTIC
+    fprintf(fc,"%-27.17e %-27.17e ",lfut*RAD,bfut*RAD);
     fprintf(fc,"\n");
-
+    //break;
   }
   fclose(fc);
 }
