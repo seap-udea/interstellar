@@ -226,7 +226,7 @@ int main(int argc,char* argv[])
     //GALACTIC
     fprintf(fc,"%-27.17e %-27.17e ",lfut*RAD,bfut*RAD);
     //DISTANCE
-    fprintf(fc,"%-27.17e ",d*1E3/PARSEC);
+    fprintf(fc,"%-27.17e ",dfut*1E3/PARSEC);
 
     fprintf(fc,"\n");
     //break;
