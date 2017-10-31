@@ -222,7 +222,7 @@ int main(int argc,char* argv[])
     //ASYMPTOTIC ELEMENTS
     fprintf(fc,"%s ",vec2strn(elts,8,"%.17e "));
     //DISTANT FUTURE
-    fprintf(fc,"%s ",vec2strn(posFuture,8,"%.17e "));
+    fprintf(fc,"%s ",vec2strn(posFuture,6,"%.17e "));
     //J2000
     fprintf(fc,"%-27.17e %-27.17e ",RAfut*RAD/15.0,DECfut*RAD);
     //GALACTIC
