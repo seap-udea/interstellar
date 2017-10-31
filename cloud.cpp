@@ -215,6 +215,8 @@ int main(int argc,char* argv[])
     fprintf(fc,"%-27.17e %-27.17e ",RA*RAD/15.0,DEC*RAD);
     //GALACTIC
     fprintf(fc,"%-27.17e %-27.17e ",l*RAD,b*RAD);
+    //DISTANCE
+    fprintf(fc,"%-27.17e ",d*1E3/AU);
     //ASYMPTOTIC ELEMENTS
     fprintf(fc,"%s ",vec2strn(elts,8,"%.17e "));
     //DISTANT FUTURE
@@ -223,6 +225,9 @@ int main(int argc,char* argv[])
     fprintf(fc,"%-27.17e %-27.17e ",RAfut*RAD/15.0,DECfut*RAD);
     //GALACTIC
     fprintf(fc,"%-27.17e %-27.17e ",lfut*RAD,bfut*RAD);
+    //DISTANCE
+    fprintf(fc,"%-27.17e ",d*1E3/PARSEC);
+
     fprintf(fc,"\n");
     //break;
   }
