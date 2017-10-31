@@ -11,6 +11,8 @@ int main(int argc,char* argv[])
   initSpice();
   FDEBUG=fopen("debug.dat","w");
 
+  int Npart=atoi(argv[1]);
+
   ////////////////////////////////////////////////////
   //INITIAL CONDITIONS
   ////////////////////////////////////////////////////
@@ -61,8 +63,8 @@ int main(int argc,char* argv[])
   //LOOP OVER PARTICLES
   ////////////////////////////////////////////////////
   FILE* fc=fopen("cloud.data","w");
-  int Npart=50;
   int Nfreq=ceil(Npart/10);
+  Nfreq=Nfreq==0?1:Nfreq;
   int j;
   for(j=0;j<Npart;j++){
 
@@ -229,7 +231,6 @@ int main(int argc,char* argv[])
     fprintf(fc,"%-27.17e ",dfut*1E3/PARSEC);
 
     fprintf(fc,"\n");
-    //break;
   }
   fclose(fc);
 }
