@@ -5,16 +5,16 @@
 # It is necessary for linking the library.
 
 # The name that we can dlopen(3).
-dlname='libgslcblas.0.dylib'
+dlname='libgslcblas.so.0'
 
 # Names of this library.
-library_names='libgslcblas.0.dylib libgslcblas.dylib'
+library_names='libgslcblas.so.0.0.0 libgslcblas.so.0 libgslcblas.so'
 
 # The name of the static archive.
 old_library='libgslcblas.a'
 
 # Linker flags that can not go in dependency_libs.
-inherited_linker_flags=' '
+inherited_linker_flags=''
 
 # Libraries that this one depends upon.
 dependency_libs=' -lm'
@@ -38,4 +38,4 @@ dlopen=''
 dlpreopen=''
 
 # Directory that this library needs to be installed in:
-libdir='/Users/jzuluaga/Dropbox/Cursos/Posgrado/Astrodynamics/AstrodynTools/util/lib'
+libdir='/home/jzuluaga/interstellar/util/gsl-2.4/tmp/lib'
