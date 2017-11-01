@@ -110,6 +110,16 @@ int main(int argc,char* argv[])
     /*to=*/elements[6]=to;
     /*mu=*/elements[7]=mu;
 
+    fprintf(stdout,"q = %.17e\n",elements[0]);
+    fprintf(stdout,"e = %.17e\n",elements[1]);
+    fprintf(stdout,"i = %.17e\n",elements[2]*RAD);
+    fprintf(stdout,"W = %.17e\n",elements[3]*RAD);
+    fprintf(stdout,"w = %.17e\n",elements[4]*RAD);
+    fprintf(stdout,"M = %.17e\n",elements[5]*RAD);
+    fprintf(stdout,"to = %.17e\n",elements[6]);
+    fprintf(stdout,"mu = %.17e\n",elements[7]);
+    exit(0);
+
     //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
     //INITIAL POSITION @ SSB
     //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
@@ -249,6 +259,8 @@ int main(int argc,char* argv[])
     fprintf(fc,"%-27.17e %-27.17e ",lfut*RAD,bfut*RAD);
     //DISTANCE
     fprintf(fc,"%-27.17e ",dfut*1E3/PARSEC);
+    //ELEMENTOS
+    fprintf(fc,"%s ",vec2strn(elements,8,"%.17e "));
 
     fprintf(fc,"\n");
   }
