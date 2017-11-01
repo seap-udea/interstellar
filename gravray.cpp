@@ -7,6 +7,7 @@ http://naif.jpl.nasa.gov/pub/naif/
 //////////////////////////////////////////
 #include <stdio.h>
 #include <math.h>
+#include <time.h>
 #include <string.h>
 #include <stdlib.h>
 #include <SpiceUsr.h>
@@ -260,6 +261,7 @@ int initSpice(void)
 
   //RANDOM NUMBERS
   RAND=gsl_rng_alloc(gsl_rng_default);
+  gsl_rng_set(RAND,time(NULL));
 
   return 0;
 }

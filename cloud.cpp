@@ -34,6 +34,7 @@ int main(int argc,char* argv[])
   //EPHEMERIS TIME
   double dt;
   double to=unitim_c(ini_to_jed,"JDTDB","TDB");
+  double tp;
   //ELEMENTS
   double q,e,inc,W,w,Mo;
   //POSITION
@@ -63,6 +64,7 @@ int main(int argc,char* argv[])
   ////////////////////////////////////////////////////
   //PREPARE ELEMENTS GENERATION
   ////////////////////////////////////////////////////
+  SpiceDouble elements[6];
   gsl_vector* ielements=gsl_vector_alloc(6);
   gsl_vector_set(ielements,0,ini_e);
   gsl_vector_set(ielements,1,ini_q);
@@ -82,6 +84,7 @@ int main(int argc,char* argv[])
   FILE* fc=fopen("cloud.data","w");
   int Nfreq=ceil(Npart/10);
   Nfreq=Nfreq==0?1:Nfreq;
+  
   for(int j=0;j<Npart;j++){
     
     if ((j%Nfreq)==0)
@@ -90,43 +93,33 @@ int main(int argc,char* argv[])
     //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
     //GENERATE INITIAL ELEMENTS (MULTIVAR)
     //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+    //GENERATE ELEMENTS BY GAUSSAN MULTIVARIATE
     gsl_linalg_cholesky_decomp1(L);
     gsl_ran_multivariate_gaussian(RAND,ielements,L,relements);
-    exit(0);
+    n=ini_n+gsl_ran_gaussian(RAND,ini_dn);
+    tp=gsl_vector_get(relements,2);
+    Mo=n*(ini_to_jed-tp);
 
-    //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-    //GENERATE INITIAL ELEMENTS
-    //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-    double fac=1.0;
-    //q
-    q=ini_q+gsl_ran_gaussian(RAND,ini_dq*fac);
-    if(VERBOSE) fprintf(stdout,"\tq = %.17e (mean = %.17e, sigma = %.17e)\n",q,ini_q,ini_dq);
-    //e
-    e=ini_e+gsl_ran_gaussian(RAND,ini_de*fac);
-    if(VERBOSE) fprintf(stdout,"\te = %.17e (mean = %.17e, sigma = %.17e)\n",e,ini_e,ini_de);
-    //i
-    inc=ini_i+gsl_ran_gaussian(RAND,ini_di*fac);
-    if(VERBOSE) fprintf(stdout,"\ti = %.17e (mean = %.17e, sigma = %.17e)\n",inc,ini_i,ini_di);
-    //W
-    W=ini_W+gsl_ran_gaussian(RAND,ini_dW*fac);
-    if(VERBOSE) fprintf(stdout,"\tW = %.17e (mean = %.17e, sigma = %.17e)\n",W,ini_W,ini_dW);
-    //w
-    w=ini_w+gsl_ran_gaussian(RAND,ini_dw*fac);
-    if(VERBOSE) fprintf(stdout,"\tw = %.17e (mean = %.17e, sigma = %.17e)\n",w,ini_w,ini_dw);
-    //Mo
-    Mo=ini_M+gsl_ran_gaussian(RAND,ini_dM*fac);
-    if(VERBOSE) fprintf(stdout,"\tM = %.17e (mean = %.17e, sigma = %.17e)\n",Mo,ini_M,ini_dM); 
-    SpiceDouble elements[]={q*AU/1e3,e,inc*DEG,W*DEG,w*DEG,Mo*DEG,to,mu};
+    //EXTRACT ELEMENTS
+    /*q=*/elements[0]=gsl_vector_get(relements,1)*AU/1e3;
+    /*e=*/elements[1]=gsl_vector_get(relements,0);
+    /*i=*/elements[2]=gsl_vector_get(relements,5)*DEG;
+    /*W=*/elements[3]=gsl_vector_get(relements,3)*DEG;
+    /*w=*/elements[4]=gsl_vector_get(relements,4)*DEG;
+    /*M=*/elements[5]=Mo*DEG;
+    /*to=*/elements[6]=to;
+    /*mu=*/elements[7]=mu;
 
     //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
     //INITIAL POSITION @ SSB
     //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
     conics_c(elements,to,position);
     if(VERBOSE) fprintf(stdout,"\tInitial position @ Sun (EJ2000) : %s\n",
-	    vec2strn(position,3,"%.17e "));
+			vec2strn(position,3,"%.17e "));
     if(VERBOSE) fprintf(stdout,"\tInitial velocity @ Sun (EJ2000) : %s\n",
-	    vec2strn(position+3,3,"%.17e "));
-
+			vec2strn(position+3,3,"%.17e "));
+    
     spkezr_c("SUN",to,"ECLIPJ2000","NONE",SSB,sun,&ltmp);
     vaddg_c(position,sun,6,position);
     if(VERBOSE) fprintf(stdout,"\tInitial position @ SSB (EJ2000) : %s\n",
