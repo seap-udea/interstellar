@@ -29,6 +29,7 @@ http://naif.jpl.nasa.gov/pub/naif/
 //////////////////////////////////////////
 //MACROS
 //////////////////////////////////////////
+#define VPRINT if(VERBOSE) fprintf(sdout
 #define D2R(x) (x*M_PI/180)
 #define R2D(x) (x*180/M_PI)
 #define DEG (M_PI/180)

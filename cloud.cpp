@@ -5,13 +5,58 @@ using namespace std;
 
 int main(int argc,char* argv[])
 {
+  /*
+    Example: ./cloud.exe 10 1
+    Where:
+    10: Number of particles
+    1: Use diagonal covariance
+
+    Input: None
+
+    Output: 
+    * cloud.data
+      Rows: 1 is for nominal solution, the rest is for random particle
+      Cols:
+          0:i
+	  1:tdb (terminal)
+	  2:tdb (future)
+	  3-8:Position Ecliptic J2000
+	  9-14:Position J2000
+	  15-20:Position Galactic J2000
+	  21:RA(h) (terminal)
+	  22:DEC(deg)
+	  23:l(deg)
+	  24:b(deg)
+	  25:d(AU)
+	  26-33:Asymptotic elements, q,e,i,W,w,Mo,to,mu
+	  34-39:Future Position Ecliptic J2000
+	  40-45:Future Position Galactic
+	  46:RA(h) (future)
+	  47:DEC(deg)
+	  48:l(deg)
+	  49:b(deg)
+	  50:d(pc)
+	  51-58:Initial elements, q,e,i,W,w,Mo,to,mu
+  */
+
   ////////////////////////////////////////////////////
   //INITIALIZE CSPICE
   ////////////////////////////////////////////////////
   initSpice();
   FDEBUG=fopen("debug.dat","w");
-
-  int Npart=atoi(argv[1]);
+  
+  ////////////////////////////////////////////////////
+  //PARAMETERS
+  ////////////////////////////////////////////////////
+  int qdiagonal=0;
+  int Npart=1;
+  if(argc>1){
+    Npart=atoi(argv[1]);
+  }
+  if(argc>2){
+    qdiagonal=atoi(argv[2]);
+  }
+  fprintf(stdout,"Running with Npart = %d, qdiagonal = %d\n",Npart,qdiagonal);
 
   ////////////////////////////////////////////////////
   //INITIAL CONDITIONS
@@ -76,6 +121,15 @@ int main(int argc,char* argv[])
   gsl_matrix* Lo=gsl_matrix_alloc(6,6);
   gsl_matrix* L=gsl_matrix_alloc(6,6);
   for(int i=0;i<6;i++) for(int j=0;j<6;j++) gsl_matrix_set(Lo,i,j,ini_cov[i][j]);
+  //DIAGONAL COVARIANCE
+  gsl_matrix* D=gsl_matrix_alloc(6,6);
+  gsl_matrix_set_zero(D);
+  gsl_matrix_set(D,0,0,ini_de*ini_de);
+  gsl_matrix_set(D,1,1,ini_dq*ini_dq);
+  gsl_matrix_set(D,2,2,ini_cov[2][2]);
+  gsl_matrix_set(D,3,3,ini_dW*ini_dW);
+  gsl_matrix_set(D,4,4,ini_dw*ini_dw);
+  gsl_matrix_set(D,5,5,ini_di*ini_di);
 
   ////////////////////////////////////////////////////
   //LOOP OVER PARTICLES
@@ -89,27 +143,41 @@ int main(int argc,char* argv[])
     if ((j%Nfreq)==0)
       fprintf(stdout,"Particle %d...\n",j+1);
 
-    //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-    //GENERATE INITIAL ELEMENTS (MULTIVAR)
-    //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-    //GENERATE ELEMENTS BY GAUSSAN MULTIVARIATE
-    gsl_matrix_memcpy(L,Lo);
-    gsl_linalg_cholesky_decomp1(L);
-    gsl_ran_multivariate_gaussian(RAND,ielements,L,relements);
-    n=ini_n+gsl_ran_gaussian(RAND,ini_dn);
-    tp=gsl_vector_get(relements,2);
-    Mo=n*(ini_to_jed-tp);
+    if(i>0){
+      //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+      //GENERATE INITIAL ELEMENTS (MULTIVAR)
+      //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+      //GENERATE ELEMENTS BY GAUSSAN MULTIVARIATE
+      if(qdiagonal)
+	gsl_matrix_memcpy(L,D);
+      else
+	gsl_matrix_memcpy(L,Lo);
+      
+      gsl_linalg_cholesky_decomp1(L);
+      gsl_ran_multivariate_gaussian(RAND,ielements,L,relements);
+      n=ini_n+gsl_ran_gaussian(RAND,ini_dn);
+      tp=gsl_vector_get(relements,2);
+      Mo=n*(ini_to_jed-tp);
 
-    //EXTRACT ELEMENTS
-    /*q=*/elements[0]=gsl_vector_get(relements,1)*AU/1e3;
-    /*e=*/elements[1]=gsl_vector_get(relements,0);
-    /*i=*/elements[2]=gsl_vector_get(relements,5)*DEG;
-    /*W=*/elements[3]=gsl_vector_get(relements,3)*DEG;
-    /*w=*/elements[4]=gsl_vector_get(relements,4)*DEG;
-    /*M=*/elements[5]=Mo*DEG;
-    /*to=*/elements[6]=to;
-    /*mu=*/elements[7]=mu;
-
+      //EXTRACT ELEMENTS
+      /*q=*/elements[0]=gsl_vector_get(relements,1)*AU/1e3;
+      /*e=*/elements[1]=gsl_vector_get(relements,0);
+      /*i=*/elements[2]=gsl_vector_get(relements,5)*DEG;
+      /*W=*/elements[3]=gsl_vector_get(relements,3)*DEG;
+      /*w=*/elements[4]=gsl_vector_get(relements,4)*DEG;
+      /*M=*/elements[5]=Mo*DEG;
+      /*to=*/elements[6]=to;
+      /*mu=*/elements[7]=mu;
+    }else{
+      /*q=*/elements[0]=ini_q*AU/1e3;
+      /*e=*/elements[1]=ini_e;
+      /*i=*/elements[2]=ini_i*DEG;
+      /*W=*/elements[3]=ini_W*DEG;
+      /*w=*/elements[4]=ini_w*DEG;
+      /*M=*/elements[5]=ini_M*DEG;
+      /*to=*/elements[6]=to;
+      /*mu=*/elements[7]=mu;
+    }      
     /*
     fprintf(stdout,"q = %.17e\n",elements[0]);
     fprintf(stdout,"e = %.17e\n",elements[1]);
