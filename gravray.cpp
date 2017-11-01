@@ -14,6 +14,7 @@ http://naif.jpl.nasa.gov/pub/naif/
 #include <gsl/gsl_errno.h>
 #include <gsl/gsl_math.h>
 #include <gsl/gsl_roots.h>
+#include <gsl/gsl_linalg.h>
 #include <gsl/gsl_multifit_nlin.h>
 #include <gsl/gsl_min.h>
 #include <gsl/gsl_multimin.h>
@@ -21,6 +22,7 @@ http://naif.jpl.nasa.gov/pub/naif/
 #include <gsl/gsl_blas.h>
 #include <gsl/gsl_rng.h>
 #include <gsl/gsl_randist.h>
+#include <gsl/gsl_cdf.h>
 #include <gsl/gsl_const_mksa.h>
 
 //////////////////////////////////////////

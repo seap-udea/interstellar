@@ -66,11 +66,31 @@ int main(int argc,char* argv[])
   FILE* fc=fopen("cloud.data","w");
   int Nfreq=ceil(Npart/10);
   Nfreq=Nfreq==0?1:Nfreq;
-  int j;
-  for(j=0;j<Npart;j++){
+  gsl_vector* ielements=gsl_vector_alloc(6);
+  gsl_vector_set(ielements,0,ini_e);
+  gsl_vector_set(ielements,1,ini_q);
+  gsl_vector_set(ielements,2,ini_tp);
+  gsl_vector_set(ielements,3,ini_W);
+  gsl_vector_set(ielements,4,ini_w);
+  gsl_vector_set(ielements,5,ini_i);
+  gsl_vector* relements=gsl_vector_alloc(6);
+  gsl_matrix* L=gsl_matrix_alloc(6,6);
+  for(int i=0;i<6;i++) 
+    for(int j=0;j<6;j++) 
+      gsl_matrix_set(L,i,j,ini_cov[i][j]);
+  exit(0);
 
+  for(int j=0;j<Npart;j++){
+    
     if ((j%Nfreq)==0)
       fprintf(stdout,"Particle %d...\n",j+1);
+
+    //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+    //GENERATE INITIAL ELEMENTS (MULTIVAR)
+    //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+    //gsl_linalg_cholesky_decomp1(L);
+    //gsl_ran_multivariate_gaussian(RAND,ielements,L,relements);
+    exit(0);
 
     //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
     //GENERATE INITIAL ELEMENTS
