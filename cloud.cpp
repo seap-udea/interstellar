@@ -61,11 +61,8 @@ int main(int argc,char* argv[])
   double tfut=to-5e5*YEAR;
 
   ////////////////////////////////////////////////////
-  //LOOP OVER PARTICLES
+  //PREPARE ELEMENTS GENERATION
   ////////////////////////////////////////////////////
-  FILE* fc=fopen("cloud.data","w");
-  int Nfreq=ceil(Npart/10);
-  Nfreq=Nfreq==0?1:Nfreq;
   gsl_vector* ielements=gsl_vector_alloc(6);
   gsl_vector_set(ielements,0,ini_e);
   gsl_vector_set(ielements,1,ini_q);
@@ -78,8 +75,13 @@ int main(int argc,char* argv[])
   for(int i=0;i<6;i++) 
     for(int j=0;j<6;j++) 
       gsl_matrix_set(L,i,j,ini_cov[i][j]);
-  exit(0);
 
+  ////////////////////////////////////////////////////
+  //LOOP OVER PARTICLES
+  ////////////////////////////////////////////////////
+  FILE* fc=fopen("cloud.data","w");
+  int Nfreq=ceil(Npart/10);
+  Nfreq=Nfreq==0?1:Nfreq;
   for(int j=0;j<Npart;j++){
     
     if ((j%Nfreq)==0)
@@ -88,8 +90,8 @@ int main(int argc,char* argv[])
     //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
     //GENERATE INITIAL ELEMENTS (MULTIVAR)
     //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-    //gsl_linalg_cholesky_decomp1(L);
-    //gsl_ran_multivariate_gaussian(RAND,ielements,L,relements);
+    gsl_linalg_cholesky_decomp1(L);
+    gsl_ran_multivariate_gaussian(RAND,ielements,L,relements);
     exit(0);
 
     //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
