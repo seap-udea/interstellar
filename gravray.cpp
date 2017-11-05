@@ -29,11 +29,11 @@ http://naif.jpl.nasa.gov/pub/naif/
 //////////////////////////////////////////
 //MACROS
 //////////////////////////////////////////
-#define VPRINT if(VERBOSE) fprintf(sdout
+#define VPRINT if(VERBOSE) fprintf
 #define D2R(x) (x*M_PI/180)
 #define R2D(x) (x*180/M_PI)
-#define DEG (M_PI/180)
-#define RAD (180/M_PI)
+#define DEG ((M_PI/180))
+#define RAD ((180/M_PI))
 #define POWI(x,n) gsl_pow_int(x,n)
 #define SGN(x) (x<0?-1:+1)
 #define MAX(x,y) (x>y?x:y)
@@ -1015,3 +1015,125 @@ char *str_replace(char *orig, char *rep, char *with)
   strcpy(tmp, orig);
   return result;
 }
+
+//PARSE LINES READ FROM A COMMA SEPARATED VALUES FILE
+#define MAXCOLS 100
+#define MAXTEXT 200
+int parseLine(char* line,char** cols,int *ncols)
+{
+  char *pt;
+  pt=strtok(line,",");
+  int i=0;
+  while(pt!= NULL) {
+    strcpy(cols[i],pt);
+    pt=strtok (NULL, ",");
+    i+=1;
+  }
+  *ncols=i;
+  return 0;
+}
+
+//CALCULATE THE EQUATORIAL->GALACTIC MATRIX 
+//ASSUMED CONSTANTS
+#define RANGP 192.85948 //RA NORTH GALACTIC POLE
+#define DECNGP 27.12825 //DEC NORTH GALACTIC POLE
+#define THETA0 122.93192 //theta_0 GALACTIC SYSTEM
+#define KC1 9.7779e8 //PC KM^-1 YR^-1, C1 CONVERSION UNIT CONSTANT IN BAILER-JONES(2015)
+#define KC2 4.74047 //AU KM^-1 YR^-1, C2 CONVERSION UNIT CONSTANT IN BAILER-JONES(2015)
+
+/*
+  Following prescription by Johnson & Soderblom, 1987
+ */
+void TGalacticMatrix(void)
+{
+  double A1[][3]={{+cos(THETA0*DEG),+sin(THETA0*DEG),0},
+		  {+sin(THETA0*DEG),-cos(THETA0*DEG),0},
+		  {0,0,+1}};
+  double A2[][3]={{-sin(DECNGP*DEG),0,+cos(DECNGP*DEG)},
+		  {0,-1,0},
+		  {+cos(DECNGP*DEG),0,+sin(DECNGP*DEG)}};
+  double A3[][3]={{+cos(RANGP*DEG),+sin(RANGP*DEG),0},
+		  {+sin(RANGP*DEG),-cos(RANGP*DEG),0},
+		  {0,0,1}};
+  double C1[3][3],C[3][3];
+
+  mxm_c(A2,A3,C1);
+  mxm_c(A1,C1,C);
+  
+  fprintf(stdout,"Galactic matrix (manual):\n");
+  fprintf(stdout,"\t%s\n",vec2str(C[0],"%.5e "));
+  fprintf(stdout,"\t%s\n",vec2str(C[1],"%.5e "));
+  fprintf(stdout,"\t%s\n",vec2str(C[2],"%.5e "));
+
+}
+
+/*
+  Following prescription by Johnson & Soderblom, 1987
+
+  Test code:
+  
+  //TEST UVW
+  ra=(1+49./60+23.35579/3600)*15;
+  dec=-(10+42./60+12.8593/3600.);
+  mura=-144;dmura=3.4;
+  mudec=-88;dmudec=3.2;
+  par=46.4;dpar=6.7;
+  vr=-1.5;dvr=1.6;
+  calcUVW(ra,dec,par,dpar,mura,dmura,mudec,dmudec,vr,dvr,UVW,dUVW);
+  fprintf(stdout,"UVW = %s +/- %s\n",vec2str(UVW,"%.5lf "),vec2str(dUVW,"%.5lf "));
+  exit(0);
+  
+ */
+int calcUVW(double ra,double dec,
+	    double par,double dpar,
+	    double mura,double dmura,
+	    double mudec,double dmudec,
+	    double vr,double dvr,
+	    double UVW[3],double dUVW[3])
+{
+  //CORRECTION BY DECLINATION
+  mura=mura*cos(dec*DEG);
+
+  //COMPUTE VSKY
+  double vsky[]={
+    vr,/*RADIAL, km/s*/
+    KC2*mura/par,/*RA, km/s*/
+    KC2*mudec/par/*DEC, km/s*/
+  };
+
+  //TRANSFORM TO LSR
+  double TM[3][3];
+  pxform_c("J2000","GALACTIC",0,TM);
+  double AM[][3]={{+cos(ra*DEG)*cos(dec*DEG),-sin(ra*DEG),-cos(ra*DEG)*sin(dec*DEG)},
+		  {+sin(ra*DEG)*cos(dec*DEG),+cos(ra*DEG),-sin(ra*DEG)*sin(dec*DEG)},
+		  {+sin(dec*DEG),0,+cos(dec*DEG)}}; 
+  double BM[3][3];
+  mxm_c(TM,AM,BM);
+  mxv_c(BM,vsky,UVW);
+
+  //COMPUTE ERRORS
+  double BM2[][3]={{BM[0][0]*BM[0][0],BM[0][1]*BM[0][1],BM[0][2]*BM[0][2]},
+		   {BM[1][0]*BM[1][0],BM[1][1]*BM[1][1],BM[1][2]*BM[1][2]},
+		   {BM[2][0]*BM[2][0],BM[2][1]*BM[2][1],BM[2][2]*BM[2][2]}};
+  double aux1=(KC2/par)*(KC2/par),aux2=(dpar/par)*(dpar/par);
+  double dmu[]={
+    dvr*dvr,
+    aux1*(dmura*dmura+(mura*mura)*aux2),
+    aux1*(dmudec*dmudec+(mudec*mudec)*aux2)
+  };
+  double bcr[]={
+    BM[0][1]*BM[0][2],
+    BM[1][1]*BM[1][2],
+    BM[2][1]*BM[2][2]
+  };
+
+  double C[3][3],V[3];
+  mxv_c(BM2,dmu,V);
+  vscl_c(2*mura*mudec/(par*par)*KC2*aux2,bcr,bcr);
+  
+  vadd_c(V,bcr,dUVW);
+  dUVW[0]=sqrt(dUVW[0]);dUVW[1]=sqrt(dUVW[1]);dUVW[2]=sqrt(dUVW[2]);
+  
+  return 0;
+}
+
