@@ -240,7 +240,7 @@ int main(int argc,char* argv[])
     fprintf(fe,"%.5lf %.5e ",dmin,tmin);
     fprintf(fe,"\n");
     
-    if(n>10) break;
+    //if(n>10) break;
     n++;
   }
   fclose(fc);
