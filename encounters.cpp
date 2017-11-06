@@ -106,7 +106,9 @@ int main(int argc,char* argv[])
     18: relative speed (km/s)
   */
   FILE* fe=fopen("encounters.data","w");
+  FILE* fg=fopen("candidates.data","w");
   fprintf(fe,"n,postarx,postary,postarz,velstarx,velstary,velstarz,posbodyperix,posbodyperiy,posbodyperiz,postarperix,postarperiy,postarperiz,dmin,tmin,vrelx,vrely,vrelz,vrel\n");
+  fprintf(fg,"n,postarx,postary,postarz,velstarx,velstary,velstarz,posbodyperix,posbodyperiy,posbodyperiz,postarperix,postarperiy,postarperiz,dmin,tmin,vrelx,vrely,vrelz,vrel\n");
 
   char **fields=(char**)malloc(MAXCOLS*sizeof(char*));
   for(int i=0;i<MAXCOLS;i++) fields[i]=(char*)malloc(MAXTEXT*sizeof(char));
@@ -170,7 +172,7 @@ int main(int argc,char* argv[])
     l=atof(fields[L]);
     b=atof(fields[B]);
     VPRINT(stdout,"\tl = %.17lf, b = %.17lf\n",l,b);
-    
+
     //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     //SECONDARY
     //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -250,12 +252,23 @@ int main(int argc,char* argv[])
     fprintf(fe,"%.5e,%.5e,",dmin,tmin);
     fprintf(fe,"%s %.5e",vec2str(vrel,"%.5e,"),vrelmag);
     fprintf(fe,"\n");
+
+    //CONDITION FOR CANDIDATES
+    if(tmin<0 && dmin<1.0){
+      fprintf(fg,"%d,",n);
+      fprintf(fg,"%s %s ",vec2str(p2,"%.5e,"),vec2str(UVW,"%.5e,"));
+      fprintf(fg,"%s %s ",vec2str(c1,"%.5e,"),vec2str(c2,"%.5e,"));
+      fprintf(fg,"%.5e,%.5e,",dmin,tmin);
+      fprintf(fg,"%s %.5e",vec2str(vrel,"%.5e,"),vrelmag);
+      fprintf(fg,"\n");
+    }
     
     //if(n>10) break;
     n++;
   }
   fclose(fc);
   fclose(fe);
+  fclose(fg);
   
   Nstars=n+1;
   VPRINT(stdout,"Number of stars: %d\n",Nstars);
