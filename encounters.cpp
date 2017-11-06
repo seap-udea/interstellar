@@ -2,6 +2,7 @@
 using namespace std;
 
 #define VERBOSE 0
+
 enum {HIP,TYCHO2_ID,SOLUTION_ID,SOURCE_ID,RANDOM_INDEX,REF_EPOCH,RA,RA_ERROR,DEC,DEC_ERROR,PARALLAX,PARALLAX_ERROR,PMRA,PMRA_ERROR,PMDEC,PMDEC_ERROR,RA_DEC_CORR,RA_PARALLAX_CORR,RA_PMRA_CORR,RA_PMDEC_CORR,DEC_PARALLAX_CORR,DEC_PMRA_CORR,DEC_PMDEC_CORR,PARALLAX_PMRA_CORR,PARALLAX_PMDEC_CORR,PMRA_PMDEC_CORR,ASTROMETRIC_N_OBS_AL,ASTROMETRIC_N_OBS_AC,ASTROMETRIC_N_GOOD_OBS_AL,ASTROMETRIC_N_GOOD_OBS_AC,ASTROMETRIC_N_BAD_OBS_AL,ASTROMETRIC_N_BAD_OBS_AC,ASTROMETRIC_DELTA_Q,ASTROMETRIC_EXCESS_NOISE,ASTROMETRIC_EXCESS_NOISE_SIG,ASTROMETRIC_PRIMARY_FLAG,ASTROMETRIC_RELEGATION_FACTOR,ASTROMETRIC_WEIGHT_AL,ASTROMETRIC_WEIGHT_AC,ASTROMETRIC_PRIORS_USED,MATCHED_OBSERVATIONS,DUPLICATED_SOURCE,SCAN_DIRECTION_STRENGTH_K1,SCAN_DIRECTION_STRENGTH_K2,SCAN_DIRECTION_STRENGTH_K3,SCAN_DIRECTION_STRENGTH_K4,SCAN_DIRECTION_MEAN_K1,SCAN_DIRECTION_MEAN_K2,SCAN_DIRECTION_MEAN_K3,SCAN_DIRECTION_MEAN_K4,PHOT_G_N_OBS,PHOT_G_MEAN_FLUX,PHOT_G_MEAN_FLUX_ERROR,PHOT_G_MEAN_MAG,PHOT_VARIABLE_FLAG,L,B,ECL_LON,ECL_LAT,RAJ2000,DEJ2000,RV,ERV,CAT};
 
 int main(int argc,char* argv[])
@@ -101,9 +102,11 @@ int main(int argc,char* argv[])
     10-12: pos.star periastro
     13: dmin (pc)
     14: tmin (yr)
-   */
+    15-17: relative velocity (km/s)
+    18: relative speed (km/s)
+  */
   FILE* fe=fopen("encounters.data","w");
-  fprintf(fe,"n,postarx,postary,postarz,velstarx,velstary,velstarz,posbodyperix,posbodyperiy,posbodyperiz,postarperix,postarperiy,postarperiz,dmin,tmin\n");
+  fprintf(fe,"n,postarx,postary,postarz,velstarx,velstary,velstarz,posbodyperix,posbodyperiy,posbodyperiz,postarperix,postarperiy,postarperiz,dmin,tmin,vrelx,vrely,vrelz,vrel\n");
 
   char **fields=(char**)malloc(MAXCOLS*sizeof(char*));
   for(int i=0;i<MAXCOLS;i++) fields[i]=(char*)malloc(MAXTEXT*sizeof(char));
@@ -215,7 +218,7 @@ int main(int argc,char* argv[])
     vsub_c(p1,p2,p1mp2);
     ucrss_c(d1,d2,nv);
     VPRINT(stdout,"\tNormal vector to skew lines: %s\n",vec2str(nv,"%.5f "));
-    dmin=vdot_c(nv,p1mp2);
+    dmin=fabs(vdot_c(nv,p1mp2));
     VPRINT(stdout,"\tMinimum distance = %.17e\n",dmin);
 
     //POINT OF MINIMUM DISTANCE
@@ -248,7 +251,7 @@ int main(int argc,char* argv[])
     fprintf(fe,"%s %.5e",vec2str(vrel,"%.5e,"),vrelmag);
     fprintf(fe,"\n");
     
-    if(n>10) break;
+    //if(n>10) break;
     n++;
   }
   fclose(fc);
@@ -258,6 +261,7 @@ int main(int argc,char* argv[])
   VPRINT(stdout,"Number of stars: %d\n",Nstars);
   return 0;
 }
+
 /*
 hip,tycho2_id,solution_id,source_id,random_index,ref_epoch,ra,ra_error,dec,dec_error,parallax,parallax_error,pmra,pmra_error,pmdec,pmdec_error,ra_dec_corr,ra_parallax_corr,ra_pmra_corr,ra_pmdec_corr,dec_parallax_corr,dec_pmra_corr,dec_pmdec_corr,parallax_pmra_corr,parallax_pmdec_corr,pmra_pmdec_corr,astrometric_n_obs_al,astrometric_n_obs_ac,astrometric_n_good_obs_al,astrometric_n_good_obs_ac,astrometric_n_bad_obs_al,astrometric_n_bad_obs_ac,astrometric_delta_q,astrometric_excess_noise,astrometric_excess_noise_sig,astrometric_primary_flag,astrometric_relegation_factor,astrometric_weight_al,astrometric_weight_ac,astrometric_priors_used,matched_observations,duplicated_source,scan_direction_strength_k1,scan_direction_strength_k2,scan_direction_strength_k3,scan_direction_strength_k4,scan_direction_mean_k1,scan_direction_mean_k2,scan_direction_mean_k3,scan_direction_mean_k4,phot_g_n_obs,phot_g_mean_flux,phot_g_mean_flux_error,phot_g_mean_mag,phot_variable_flag,l,b,ecl_lon,ecl_lat,RAJ2000,DEJ2000,RV,eRV,CAT
 NULL,55-72-1,1635378410781933568,16870631694208,1081909,2015.0,45.1127787196,0.206981018629,0.38084351483400003,0.150942984191,2.09081229243,0.222205844313,-1.57292770474,1.7331941971200002,-11.6616159547,0.982994152333,-0.18713556,0.41238126,-0.28435326,0.09948922,-0.13931505,0.23891407,-0.35899627,0.09374801,-0.277202,-0.9042231,79,79,79,76,0,3,NULL,0.253709333143,88.6260569708,True,2.6545267000000003,13.709007999999999,2.5737182999999998e-05,5,10,False,0.39078984,0.3336923,0.40038670000000004,0.9007094999999999,-88.302666,14.786093,-47.974358,27.022827000000003,87,967144.0942899999,601.801663362,10.5610421033,NOT_AVAILABLE,176.665031972,-48.5568508384,42.7641399122,-16.0048855323,45.112829999999995,0.38092,2.061,1.073,RAVE-DR5.tsv
