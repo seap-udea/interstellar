@@ -88,6 +88,7 @@ int main(int argc,char* argv[])
   double *p2,*d2,p1mp2[3],nv[3],nv1[3],nv2[3],dc1[3],dc2[3],c1[3],c2[3],drp[3];
   double d1n2,d2n1;
   double dmin,tmin;
+  double vrel[3],vrelmag;
 
   //GALACTIC TRANSFORMATION MATRIX
   pxform_c("J2000","GALACTIC",0,TM);
@@ -101,7 +102,9 @@ int main(int argc,char* argv[])
     13: dmin (pc)
     14: tmin (yr)
    */
-  FILE* fe=fopen("encounter.data","w");
+  FILE* fe=fopen("encounters.data","w");
+  fprintf(fe,"n,postarx,postary,postarz,velstarx,velstary,velstarz,posbodyperix,posbodyperiy,posbodyperiz,postarperix,postarperiy,postarperiz,dmin,tmin\n");
+
   char **fields=(char**)malloc(MAXCOLS*sizeof(char*));
   for(int i=0;i<MAXCOLS;i++) fields[i]=(char*)malloc(MAXTEXT*sizeof(char));
   int Nfreq=10000;
@@ -233,14 +236,19 @@ int main(int argc,char* argv[])
     tmin=(c1[0]-p1[0])/(d1[0]*1e3/KC1);
     VPRINT(stdout,"\tTime for minimum distance = %.17e\n",tmin);
 
+    //RELATIVE VELOCITY AT MINIMUM DISTANCE
+    vsub_c(d2,d1,vrel);
+    vrelmag=vnorm_c(vrel);
+
     //STORE INFORMATION
-    fprintf(fe,"%d ",n);
-    fprintf(fe,"%s %s ",vec2str(p2,"%.5lf,"),vec2str(UVW,"%.5lf,"));
-    fprintf(fe,"%s %s ",vec2str(c1,"%.5lf,"),vec2str(c2,"%.5lf,"));
-    fprintf(fe,"%.5lf %.5e ",dmin,tmin);
+    fprintf(fe,"%d,",n);
+    fprintf(fe,"%s,%s,",vec2str(p2,"%.5e,"),vec2str(UVW,"%.5e,"));
+    fprintf(fe,"%s,%s,",vec2str(c1,"%.5e,"),vec2str(c2,"%.5e,"));
+    fprintf(fe,"%.5e,%.5e,",dmin,tmin);
+    fprintf(fe,"%s,%.5e",vec2str(vrel,"%.5e,"),vrelmag);
     fprintf(fe,"\n");
     
-    //if(n>10) break;
+    if(n>10) break;
     n++;
   }
   fclose(fc);
