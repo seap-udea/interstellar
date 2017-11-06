@@ -32,7 +32,7 @@ int main(int argc,char* argv[])
   //GENERAL VARIABLES
   ////////////////////////////////////////////////////
   double tmp;
-  char ctmp[100],line[10000];
+  char ctmp[100],line[10000],aline[10000];
 
   ////////////////////////////////////////////////////
   //READING DATA
@@ -108,12 +108,15 @@ int main(int argc,char* argv[])
   FILE* fe=fopen("encounters.csv","w");
   FILE* fg=fopen("candidates.csv","w");
   fprintf(fe,"n,postarx,postary,postarz,velstarx,velstary,velstarz,posbodyperix,posbodyperiy,posbodyperiz,postarperix,postarperiy,postarperiz,dmin,tmin,vrelx,vrely,vrelz,vrel\n");
-  fprintf(fg,"n,postarx,postary,postarz,velstarx,velstary,velstarz,posbodyperix,posbodyperiy,posbodyperiz,postarperix,postarperiy,postarperiz,dmin,tmin,vrelx,vrely,vrelz,vrel\n");
+
+  fprintf(fg,"n,postarx,postary,postarz,velstarx,velstary,velstarz,posbodyperix,posbodyperiy,posbodyperiz,postarperix,postarperiy,postarperiz,dmin,tmin,vrelx,vrely,vrelz,vrel,hip,tycho2_id,solution_id,source_id,random_index,ref_epoch,ra,ra_error,dec,dec_error,parallax,parallax_error,pmra,pmra_error,pmdec,pmdec_error,ra_dec_corr,ra_parallax_corr,ra_pmra_corr,ra_pmdec_corr,dec_parallax_corr,dec_pmra_corr,dec_pmdec_corr,parallax_pmra_corr,parallax_pmdec_corr,pmra_pmdec_corr,astrometric_n_obs_al,astrometric_n_obs_ac,astrometric_n_good_obs_al,astrometric_n_good_obs_ac,astrometric_n_bad_obs_al,astrometric_n_bad_obs_ac,astrometric_delta_q,astrometric_excess_noise,astrometric_excess_noise_sig,astrometric_primary_flag,astrometric_relegation_factor,astrometric_weight_al,astrometric_weight_ac,astrometric_priors_used,matched_observations,duplicated_source,scan_direction_strength_k1,scan_direction_strength_k2,scan_direction_strength_k3,scan_direction_strength_k4,scan_direction_mean_k1,scan_direction_mean_k2,scan_direction_mean_k3,scan_direction_mean_k4,phot_g_n_obs,phot_g_mean_flux,phot_g_mean_flux_error,phot_g_mean_mag,phot_variable_flag,l,b,ecl_lon,ecl_lat,RAJ2000,DEJ2000,RV,eRV,CAT\n");
 
   char **fields=(char**)malloc(MAXCOLS*sizeof(char*));
   for(int i=0;i<MAXCOLS;i++) fields[i]=(char*)malloc(MAXTEXT*sizeof(char));
   int Nfreq=10000;
   while(fscanf(fc,"%s",line)==1){
+
+    strcpy(aline,line);
 
     //SHOW
     if((n%Nfreq)==0){
@@ -260,7 +263,7 @@ int main(int argc,char* argv[])
       fprintf(fg,"%s %s ",vec2str(c1,"%.5e,"),vec2str(c2,"%.5e,"));
       fprintf(fg,"%.5e,%.5e,",dmin,tmin);
       fprintf(fg,"%s %.5e,",vec2str(vrel,"%.5e,"),vrelmag);
-      fprintf(fg,"%s ",line);
+      fprintf(fg,"%s ",aline);
       fprintf(fg,"\n");
     }
     
