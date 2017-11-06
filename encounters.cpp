@@ -242,10 +242,10 @@ int main(int argc,char* argv[])
 
     //STORE INFORMATION
     fprintf(fe,"%d,",n);
-    fprintf(fe,"%s,%s,",vec2str(p2,"%.5e,"),vec2str(UVW,"%.5e,"));
-    fprintf(fe,"%s,%s,",vec2str(c1,"%.5e,"),vec2str(c2,"%.5e,"));
+    fprintf(fe,"%s %s ",vec2str(p2,"%.5e,"),vec2str(UVW,"%.5e,"));
+    fprintf(fe,"%s %s ",vec2str(c1,"%.5e,"),vec2str(c2,"%.5e,"));
     fprintf(fe,"%.5e,%.5e,",dmin,tmin);
-    fprintf(fe,"%s,%.5e",vec2str(vrel,"%.5e,"),vrelmag);
+    fprintf(fe,"%s %.5e",vec2str(vrel,"%.5e,"),vrelmag);
     fprintf(fe,"\n");
     
     if(n>10) break;
