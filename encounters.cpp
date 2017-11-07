@@ -58,7 +58,7 @@ int main(int argc,char* argv[])
   VPRINT(stdout,"Object skew line: p=(%s), d=(%s)\n",
 	 vec2strn(p1,3,"%.17e,"),
 	 vec2strn(d1,3,"%.17e,"));
-  
+
   ////////////////////////////////////////////////////
   //READING GAIA DATABASE
   ////////////////////////////////////////////////////
@@ -86,9 +86,11 @@ int main(int argc,char* argv[])
   double TM[3][3],BM[3][3];
   double vsky[3],dvsky[3],UVW[3],dUVW[3];
 
-  double *p2,*d2,p1mp2[3],nv[3],nv1[3],nv2[3],dc1[3],dc2[3],c1[3],c2[3],drp[3];
+  double *p2,*d2,p1mp2[3],r1mr2[3],d1md2[3],nv[3],nv1[3],nv2[3];
+  double dc1[3],dc2[3],c1[3],c2[3],drp[3];
+  double dvnorm;
   double d1n2,d2n1;
-  double dmin,tmin;
+  double dmin,tmin,tmin1,tmin2;
   double vrel[3],vrelmag;
 
   //GALACTIC TRANSFORMATION MATRIX
@@ -101,7 +103,8 @@ int main(int argc,char* argv[])
     7-9: pos.body periastro
     10-12: pos.star periastro
     13: dmin (pc)
-    14: tmin (yr)
+    14: tmin1 (yr)
+    14: tmin2 (yr)
     15-17: relative velocity (km/s)
     18: relative speed (km/s)
   */
@@ -113,6 +116,7 @@ int main(int argc,char* argv[])
 
   char **fields=(char**)malloc(MAXCOLS*sizeof(char*));
   for(int i=0;i<MAXCOLS;i++) fields[i]=(char*)malloc(MAXTEXT*sizeof(char));
+
   int Nfreq=10000;
   while(fscanf(fc,"%s",line)==1){
 
@@ -215,12 +219,20 @@ int main(int argc,char* argv[])
 	   vec2str(dUVW,"%.5f "));
 
     //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    //CALCULATE PERISTAR
+    //CALCULATE MINIMUM DISTANCE
     //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
     //MINIMUM DISTANCE
     p2=postar;
     d2=UVW;
+
+    VPRINT(stdout,"\tPosition particle: %s\n",vec2str(p1,"%.5lf,"));
+    VPRINT(stdout,"\tVelocity particle: %s\n",vec2str(d1,"%.5lf,"));
+    VPRINT(stdout,"\tPosition star: %s\n",vec2str(p2,"%.5lf,"));
+    VPRINT(stdout,"\tVelocity star: %s\n",vec2str(d2,"%.5lf,"));
+
     vsub_c(p1,p2,p1mp2);
+    vsub_c(d1,d2,d1md2);
     ucrss_c(d1,d2,nv);
     VPRINT(stdout,"\tNormal vector to skew lines: %s\n",vec2str(nv,"%.5f "));
     dmin=fabs(vdot_c(nv,p1mp2));
@@ -241,9 +253,22 @@ int main(int argc,char* argv[])
     VPRINT(stdout,"\tDistance traveleded by body until crossing point: %s\n",vec2str(drp,"%.5f "));
 
     //TIME OF MINIMUM DISTANCE
-    tmin=(c1[0]-p1[0])/(d1[0]*1e3/KC1);
-    VPRINT(stdout,"\tTime for minimum distance = %.17e\n",tmin);
+    tmin1=(c1[0]-p1[0])/(d1[0]*1e3/KC1);
+    tmin2=(c2[0]-p2[0])/(d2[0]*1e3/KC1);
+    VPRINT(stdout,"\tTime for minimum distance 1 = %.17e\n",tmin1);
+    VPRINT(stdout,"\tTime for minimum distance 2 = %.17e\n",tmin2);
 
+    //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    //CALCULATE PERISTAR
+    //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    dvnorm=vnorm_c(d1md2);
+    tmin=-vdot_c(p1mp2,d1md2)/(dvnorm*dvnorm);
+    VPRINT(stdout,"\tTime for minimum distance dynamic = %.17e\n",tmin);
+    vscl_c(tmin,d1md2,d1md2);
+    vadd_c(p1mp2,d1md2,r1mr2);
+    dmin=vnorm_c(r1mr2);
+    VPRINT(stdout,"\tMinimum distance dynamic = %.17e\n",dmin);
+    
     //RELATIVE VELOCITY AT MINIMUM DISTANCE
     vsub_c(d2,d1,vrel);
     vrelmag=vnorm_c(vrel);

@@ -1019,6 +1019,7 @@ char *str_replace(char *orig, char *rep, char *with)
 //PARSE LINES READ FROM A COMMA SEPARATED VALUES FILE
 #define MAXCOLS 100
 #define MAXTEXT 200
+#define MAXLINE 10000
 int parseLine(char* line,char** cols,int *ncols)
 {
   char *pt;
@@ -1040,6 +1041,87 @@ int parseLine(char* line,char** cols,int *ncols)
 #define THETA0 122.93192 //theta_0 GALACTIC SYSTEM
 #define KC1 9.7779e8 //PC KM^-1 YR^-1, C1 CONVERSION UNIT CONSTANT IN BAILER-JONES(2015)
 #define KC2 4.74047 //AU KM^-1 YR^-1, C2 CONVERSION UNIT CONSTANT IN BAILER-JONES(2015)
+
+//GALACTIC COORDINATES OF THE SUN AND GALACTIC POTENTIAL
+/*
+  See
+  http://docs.astropy.org/en/stable/api/astropy.coordinates.Galactocentric.html
+  for details
+ */
+//GIVEN BY https://ui.adsabs.harvard.edu/#abs/2009ApJ…692.1075G/abstract
+#define ROSUN 8.3E3 //PC
+//GIVEN BY https://ui.adsabs.harvard.edu/#abs/2001ApJ…553..184C/abstract
+#define ZSUN 27.0 //PC, 
+#define PHISUN 0.0 //DEG
+//GIVEN BY: https://ui.adsabs.harvard.edu/#abs/2010MNRAS.403.1829S/abstract
+#define USUN 11.1 //km/s, U IN DIRECTION OF -r 
+#define VSUN 12.24 //km/s V IN DIRECTION OF -phi
+#define WSUN 7.25 //km/s, W IN DIRECTION OF z
+//GIVEN BY: https://ui.adsabs.harvard.edu/#abs/2015ApJS..216...29B/abstract
+#define VCIRC 220.0 //km/s
+
+//GIVEN BY BOILER-JONES (2017)
+#define MDISK 7.91e10 //Msun
+#define ADISK 3500.0 //PC
+#define BDISK 250.0 //PC
+#define MBULGE 1.40e10 //Msun
+#define BBULGE 350.0 //PC
+#define MHALO 6.98e11 //Msun
+#define BBULGE 24000.0 //PC
+
+/*
+  Gradient of the Kuzmin Potential
+
+  phi(R,z) = -mu / sqrt( R^2 + (a+ sqrt(z^2+b^2))^2)
+ */
+int gradKuzmin(double R,double z,double mu,double a,double b,
+		double *dphidR,double *dphidz)
+{
+  double u,d,D,B;
+  
+  B=(b*b+z*z);
+  u=(a+sqrt(B));
+  d=(R*R+u*u);
+  D=sqrt(d)*d;
+  *dphidR=mu*R/D;
+  *dphidz=mu*u*z/D/B;
+}
+
+/*
+  Three components potential of Miyamoto & Nagai (1975)
+  
+  Compute the derivatives of the potential
+*/
+int gradGalacticPotential(double R,double z,
+			   double *dphidR,double *dphidz,
+			   double *params)
+{
+  //Parameters: Component 0 is reserved
+  double mud=params[1],ad=params[2],bd=params[3];
+  double mub=params[4],ab=params[5],bb=params[6];
+  double muh=params[7],ah=params[8],bh=params[9];
+  double dfdR=0.0,dfdz=0.0;
+  *dphidR=0.0;
+  *dphidz=0.0;
+    
+  //Disk
+  gradKuzmin(R,z,mud,ad,bd,&dfdR,&dfdz);
+  *dphidR+=dfdR;
+  *dphidz+=dfdz;
+  
+  //Bulge
+  gradKuzmin(R,z,mub,ab,bb,&dfdR,&dfdz);
+  *dphidR+=dfdR;
+  *dphidz+=dfdz;
+  
+  //dphi/dz
+  gradKuzmin(R,z,muh,ah,bh,&dfdR,&dfdz);
+  *dphidR+=dfdR;
+  *dphidz+=dfdz;
+
+  return 0;
+}
+
 
 /*
   Following prescription by Johnson & Soderblom, 1987
@@ -1137,3 +1219,176 @@ int calcUVW(double ra,double dec,
   return 0;
 }
 
+/*
+  Transform XYZ,UVW w.r.t. LSR to X,Y,Z,VX,VY,VZ w.r.t. Galactic Center
+  r: XYZ (Cartesian Galactic Coordinates), UVW 
+  Units: km,km/s
+
+  Test:
+  double xLSR_s[]={-3.16028e+02*PARSEC, 1.84156e+01*PARSEC, -3.58527e+02*PARSEC, 
+                   1.33746e+01, -1.72967e+01, -1.54271e+01};
+  VPRINT(stdout,"LSR (star) = %s\n",vec2strn(xLSR_s,6,"%.5e "));
+  double xGC_s[6];
+  LSR2GC(xLSR_s,xGC_s);
+  vscl_c(1/PARSEC,xGC_s,xGC_s);
+  VPRINT(stdout,"GC (star) = %s (pc,km/s)\n",vec2strn(xGC_s,6,"%.5e "));
+  
+  Compared to AstroPy:
+
+  import astropy.coordinates as coord
+  import astropy.units as u
+
+  c1 = coord.ICRS(ra=45.1128*u.degree, dec=0.380844*u.degree,
+    distance=(2.09081*u.mas).to(u.pc, u.parallax()),
+    pm_ra_cosdec=-1.57293*np.cos(0.380844*np.pi/180)*u.mas/u.yr,
+    pm_dec=-11.6616*u.mas/u.yr,
+    radial_velocity=2.061*u.km/u.s)
+  
+  print(c1.transform_to(coord.Galactocentric)
+    (x, y, z) in pc
+    (-8617.14887136,  18.41629297, -330.49785565)
+    (v_x, v_y, v_z) in km / s
+    ( 24.42433714,  214.94327839, -8.22049138)>
+ */
+int LSR2GC(double LSR[6],double GC[6])
+{
+  //CONSTANT
+  double UVW_Sun[]={USUN,(VSUN+VCIRC),WSUN};
+  double theta=asin(ZSUN/ROSUN);
+  double MGC[][3]={{cos(theta),0,sin(theta)},
+		   {0,1.0,0},
+		   {-sin(theta),0,cos(theta)}};
+  VPRINT(stdout,"theta = %.3lf degrees\n",theta*RAD);
+  VPRINT(stdout,"UVW (SUN) = %s\n",vec2str(UVW_Sun,"%.5e "));
+
+  //Input
+  VPRINT(stdout,"UVW (LSR) = %s\n",vec2str(LSR+3,"%.5e "));
+
+  //Add Solar System Barycenter Velocity
+  vadd_c(LSR+3,UVW_Sun,GC+3);
+  VPRINT(stdout,"GC (inclined) = %s\n",vec2str(GC+3,"%.5e "));
+
+  //Rotate for zsun
+  mxv_c(MGC,GC+3,GC+3);
+  VPRINT(stdout,"GC (ICRS) = %s\n",vec2str(GC+3,"%.5e "));
+
+  //Compute cartesian coordinates respect to galactic center
+  double r_Sun[]={-ROSUN*PARSEC/1e3,0,0};
+  double rup[3];
+  VPRINT(stdout,"r (SUN) = %s\n",vec2str(r_Sun,"%.5e "));
+  VPRINT(stdout,"r (LSR) = %s\n",vec2str(LSR,"%.5e "));
+  vadd_c(LSR,r_Sun,rup);
+  VPRINT(stdout,"r (inclined) = %s\n",vec2str(rup,"%.5e "));
+
+  //Rotate for zsun
+  mxv_c(MGC,rup,GC);
+  VPRINT(stdout,"r (GC) = %s\n",vec2str(GC,"%.5e "));
+
+  return 0;
+}
+
+int integrateEoM(double tini,double X0[],double h,int npoints,double duration,
+		 int nsys,int eom(double,double*,double*,void*),void *params,
+		 double *ts,double** X)
+{
+  //INTEGRATE GC
+  double direction=duration/fabs(duration);
+  h*=direction;
+  double t_start=tini;
+  double t_step=duration/(npoints-1);
+  double tend=t_start+duration;
+  double t_stop=tend;
+  double t=t_start;
+  double h_used=h;
+  double deltat,h_next,h_adjust;
+  int status;
+  double x0[nsys],x[nsys];
+
+  VPRINT(stdout,"Integration parameters:\n");
+  VPRINT(stdout,"\ttini = %.5e UT\n",tini);
+  VPRINT(stdout,"\tt_start = %.5e UT\n",t_start);
+  VPRINT(stdout,"\tt_stop = %.5e UT\n",t_stop);
+  VPRINT(stdout,"\tt_step = %.5e UT\n",t_step);
+  VPRINT(stdout,"\ttend = %.5e UT\n",tend);
+  VPRINT(stdout,"\th = %.5e UT\n",h);
+  VPRINT(stdout,"\tt = %.5e UT\n",t);
+  VPRINT(stdout,"\th_used = %.5e UT\n",h_used);
+  VPRINT(stdout,"\tDirection = %.0lf UT\n",direction);
+  
+  //INITIAL CONDITIONS
+  copyVec(x0,X0,nsys);
+  copyVec(x,x0,nsys);
+  VPRINT(stdout,"\ty = %s\n",vec2strn(x0,nsys,"%.7e "));
+
+  //INTEGRATE
+  for(int i=0;i<npoints;i++) {
+    ts[i]=t;
+    copyVec(X[i],x0,nsys);
+    deltat=t-tini;
+    if(direction*((t_start+t_step)-tend)>0) t_step=(tend-t_start);
+    t_stop=t_start+t_step;
+    h_used=h;
+    VPRINT(stdout,"Step %d: t = %.5e UT\n",i,t);
+    VPRINT(stdout,"\tt_start = %.5e UT\n",t_start);
+    VPRINT(stdout,"\tt_stop = %.5e UT\n",t_stop);
+    VPRINT(stdout,"\th_used = %.5e UT\n",h_used);
+    VPRINT(stdout,"\ty0 = %s\n",vec2strn(x0,nsys,"%.7e "));
+    VPRINT(stdout,"\ty = %s\n",vec2strn(x,nsys,"%.7e "));
+    VPRINT(stdout,"\tparams = %s\n",vec2strn((double*)params,2,"%.2e "));
+    do {
+      while(1){
+	status=Gragg_Bulirsch_Stoer(eom,x0,x,t,h_used,&h_next,1.0,
+				    TOLERANCE,EXTMET,params);
+	if(status) h_used/=4.0;
+	else break;
+      }
+      t+=h_used;
+      copyVec(x0,x,nsys);
+      if(direction*(t+h_next-t_stop)>0) h_used=t+h_next-t_stop;
+      else h_used=h_next;
+    }while(direction*(t-(t_stop-direction*1.e-10))<0);
+    if(direction*(t-t_stop)>0){
+      h_adjust=(t_stop-t);
+      status=Gragg_Bulirsch_Stoer(eom,x0,x,t,h_adjust,&h_next,1.0,
+				  TOLERANCE,EXTMET,params);
+      copyVec(x0,x,nsys);
+      t=t_stop;
+    }
+    t_start = t;
+    if(direction*(t_start-tend)>0) break;
+  }
+  return 0;
+}
+
+int EoMGalactic(double t,double y[],double dydt[],void *params) 
+{ 
+  double* ps=(double*)params;
+  int nsys=(int)ps[0];
+  int Npart=(int)ps[1];
+  double *r;
+  
+  //VPRINT(stdout,"Number of particles: %d (sys. %d)\n",Npart,nsys);
+  //VPRINT(stdout,"\ty = %s\n",vec2strn(y,nsys,"%.17e "));
+
+  //dydt=vy
+  for(int i=Npart;i-->0;){
+    int ip=6*i;
+    int j=ip;
+    dydt[j]=y[j+3];j++;
+    dydt[j]=y[j+3];j++;
+    dydt[j]=y[j+3];j++;
+  }
+
+  //dvdt=f(y,vy,t)
+  for(int i=Npart;i-->=0;){
+    int ip=6*i;
+    int j=ip+3;
+    r=y+ip;
+    dydt[j]=0;j++;
+    dydt[j]=0;j++;
+    dydt[j]=0;j++;
+  }
+  
+  //VPRINT(stdout,"\tdydt = %s\n",vec2strn(dydt,nsys,"%.17e "));
+  return 0;
+}
