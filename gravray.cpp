@@ -37,6 +37,7 @@ http://naif.jpl.nasa.gov/pub/naif/
 #define POWI(x,n) gsl_pow_int(x,n)
 #define SGN(x) (x<0?-1:+1)
 #define MAX(x,y) (x>y?x:y)
+#define MIN(x,y) (x<y?x:y)
 
 //////////////////////////////////////////
 //CSPICE CONSTANTS
@@ -1017,9 +1018,9 @@ char *str_replace(char *orig, char *rep, char *with)
 }
 
 //PARSE LINES READ FROM A COMMA SEPARATED VALUES FILE
-#define MAXCOLS 100
+#define MAXCOLS 10000
 #define MAXTEXT 200
-#define MAXLINE 10000
+#define MAXLINE 100000
 int parseLine(char* line,char** cols,int *ncols)
 {
   char *pt;
@@ -1406,6 +1407,7 @@ int integrateEoM(double tini,double X0[],double h,int npoints,double duration,
   VPRINT(stdout,"\tt = %.5e UT\n",t);
   VPRINT(stdout,"\th_used = %.5e UT\n",h_used);
   VPRINT(stdout,"\tDirection = %.0lf UT\n",direction);
+  if(VERBOSE) getchar();
   
   //INITIAL CONDITIONS
   copyVec(x0,X0,nsys);
@@ -1413,6 +1415,7 @@ int integrateEoM(double tini,double X0[],double h,int npoints,double duration,
   VPRINT(stdout,"\ty = %s\n",vec2strn(x0,nsys,"%.7e "));
 
   //INTEGRATE
+  char qpause=0;
   for(int i=0;i<npoints;i++) {
     ts[i]=t;
     copyVec(X[i],x0,nsys);
@@ -1426,19 +1429,51 @@ int integrateEoM(double tini,double X0[],double h,int npoints,double duration,
     VPRINT(stdout,"\th_used = %.5e UT\n",h_used);
     VPRINT(stdout,"\ty0 = %s\n",vec2strn(x0,nsys,"%.7e "));
     VPRINT(stdout,"\ty = %s\n",vec2strn(x,nsys,"%.7e "));
-    VPRINT(stdout,"\tparams = %s\n",vec2strn((double*)params,2,"%.2e "));
+
     do {
       while(1){
 	status=Gragg_Bulirsch_Stoer(eom,x0,x,t,h_used,&h_next,1.0,
 				    TOLERANCE,EXTMET,params);
-	if(status) h_used/=4.0;
+
+	VPRINT(stdout,"\t\tStatus = %d, h_used = %e, h_next = %e, x = %s\n",
+	       status,h_used,h_next,vec2strn(x,nsys/2,"%.17e,"));
+
+	if(status){
+	  //if(fabs(h_next)>fabs(h_used)) h_used=h_next;
+	  //else 
+	  h_used/=4.0;
+	  VPRINT(stdout,"\t\t\tAdaptando paso h_used = %e, h_next = %e\n",h_used,h_next);
+	  if(h_used>0) exit(0);
+	  if(VERBOSE) getchar();
+	  qpause=1;
+	}
 	else break;
       }
+
+      VPRINT(stdout,"\t\tSali del condenado ciclo con h_used = %e, h_next = %e\n",h_used,h_next);
+
       t+=h_used;
       copyVec(x0,x,nsys);
-      if(direction*(t+h_next-t_stop)>0) h_used=t+h_next-t_stop;
-      else h_used=h_next;
-    }while(direction*(t-(t_stop-direction*1.e-10))<0);
+
+      VPRINT(stdout,"\t\tLlegue a t = %.17e (t_stop = %.17e)\n",t,t_stop);
+
+      if(direction*(t+h_next-t_stop)>0){
+	//h_used=t+h_next-t_stop;
+	h_used=h_next+(t_stop-(t+h_next));
+	VPRINT(stdout,"\t\tUso lo que me falta: %e\n",h_used);
+	if(VERBOSE) getchar();
+      }
+      else{
+	h_used=h_next;
+	VPRINT(stdout,"\t\tUso h_next\n");
+      }
+
+      VPRINT(stdout,"\t\tEn el siguiente paso usaré h = %e\n",h_used);
+      if(VERBOSE && qpause) getchar();
+
+    }while(direction*(t-(t_stop-direction*fabs(t_step)*1.e-7))<0);
+    VPRINT(stdout,"\tComplete ese condenado intervalo\n");
+
     if(direction*(t-t_stop)>0){
       h_adjust=(t_stop-t);
       status=Gragg_Bulirsch_Stoer(eom,x0,x,t,h_adjust,&h_next,1.0,
@@ -1527,12 +1562,61 @@ int EoMGalactic(double t,double y[],double dydt[],void *params)
     dydt[k]=-dphidz;k++;
     //*/
   }
-  
+
   /*
-  fprintf(stdout,"\ty = %s\n\tdydt = %s\n",
-	  vec2strn(y,nsys,"%.17e "),
-	  vec2strn(dydt,nsys,"%.17e "));
-  exit(0);
+  VPRINT(stdout,"\ty = %s\n\tdydt = %s\n",
+	 vec2strn(y,nsys,"%.17e "),
+	 vec2strn(dydt,nsys,"%.17e "));
+  //*/
+  //exit(0);
   //*/
   return 0;
+}
+
+int findTime(double t,double tsp[],int Ntimesp)
+{
+  double sgn=t/fabs(t);
+  for(int i=Ntimesp;i-->0;) if(sgn*(t-tsp[i])>0) return i;
+  return -1;
+}
+
+/*
+  Compute the distance from a point to an interval
+
+  Perpendicular distance :
+  Formula in: 
+  https://math.stackexchange.com/questions/1300484/distance-between-line-and-a-point
+ */
+double distancePointLine(double p[],double p1[],double p2[],double *dtfrac)
+{
+  double p2mp1[3],pmp1[3],pmp2[3],pm[3],d[3],p2mp1a,pma,dmin,d1,d2;
+
+  //Useful vectors
+  vsub_c(p2,p1,p2mp1);
+  vsub_c(p,p1,pmp1);
+  vsub_c(p,p2,pmp2);
+  p2mp1a=vnorm_c(p2mp1);
+
+  //Compute perpendicular distance
+  vscl_c(vdot_c(pmp1,p2mp1)/(p2mp1a*p2mp1a),p2mp1,pm);
+  vsub_c(pmp1,pm,d);
+  pma=vnorm_c(d);
+  *dtfrac=pm[0]/p2mp1[0];
+
+  if(*dtfrac>=0 && *dtfrac<=1){
+    VPRINT(stdout,"Inside distance (dtfrac = %e)\n",*dtfrac);
+    dmin=pma;
+  }
+  else{
+    VPRINT(stdout,"Extreme distance (d1=%e,d2=%e)\n",vnorm_c(pmp1),vnorm_c(pmp2));
+    if(*dtfrac<0){
+      dmin=vnorm_c(pmp1);
+      *dtfrac=0;
+    }else{
+      dmin=vnorm_c(pmp2);
+      *dtfrac=0;
+    }
+  }
+
+  return dmin;
 }
