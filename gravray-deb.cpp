@@ -1521,7 +1521,7 @@ int EoMGalactic(double t,double y[],double dydt[],void *params)
     //*/
     //*
     //LMA POLAR
-    //dphidR=0.0;dphidq=0.0;dphidz=0.0;
+    dphidR=0.0;dphidq=0.0;dphidz=0.0;
     dydt[k]=-dphidR+R*uq*uq;k++;
     dydt[k]=-dphidq-2*vR*uq/R;k++;
     dydt[k]=-dphidz;k++;

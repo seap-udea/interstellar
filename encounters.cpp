@@ -232,7 +232,6 @@ int main(int argc,char* argv[])
     VPRINT(stdout,"\tVelocity star: %s\n",vec2str(d2,"%.5lf,"));
 
     vsub_c(p1,p2,p1mp2);
-    vsub_c(d1,d2,d1md2);
     ucrss_c(d1,d2,nv);
     VPRINT(stdout,"\tNormal vector to skew lines: %s\n",vec2str(nv,"%.5f "));
     dmin=fabs(vdot_c(nv,p1mp2));
@@ -261,6 +260,8 @@ int main(int argc,char* argv[])
     //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     //CALCULATE PERISTAR
     //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    vsub_c(d1,d2,d1md2);
+    vscl_c(1e3/KC1,d1md2,d1md2);
     dvnorm=vnorm_c(d1md2);
     tmin=-vdot_c(p1mp2,d1md2)/(dvnorm*dvnorm);
     VPRINT(stdout,"\tTime for minimum distance dynamic = %.17e\n",tmin);
@@ -268,6 +269,22 @@ int main(int argc,char* argv[])
     vadd_c(p1mp2,d1md2,r1mr2);
     dmin=vnorm_c(r1mr2);
     VPRINT(stdout,"\tMinimum distance dynamic = %.17e\n",dmin);
+    /*
+    if(strcmp(fields[HIP],"40170.0")==0 || n==214593){
+      printf("Este es: HIP=%s, tmin=%lf, dmin=%lf\n",fields[HIP],tmin,dmin);
+      printf("Este es: p1=[%s], d1=[%s], p2=[%s], d2=[%s]\n",
+	     vec2str(p1,"%.3lf,"),
+	     vec2str(d1,"%.3lf,"),
+	     vec2str(p2,"%.3lf,"),
+	     vec2str(d2,"%.3lf,"));
+      printf("Este es: p1-p2=[%s], d1-d2=[%s], dfut=[%s], r1-r2=[%s]\n",
+	     vec2str(p1mp2,"%.3lf,"),
+	     vec2str(d1md2,"%.3lf,"),
+	     vec2str(dfut,"%.3lf,"),
+	     vec2str(r1mr2,"%.3lf,"));
+      exit(0);
+    }
+    */
     
     //RELATIVE VELOCITY AT MINIMUM DISTANCE
     vsub_c(d2,d1,vrel);
@@ -282,7 +299,7 @@ int main(int argc,char* argv[])
     fprintf(fe,"\n");
 
     //CONDITION FOR CANDIDATES
-    if(tmin<0 && dmin<=1.0){
+    if(tmin<0 && dmin<=5.0){
       fprintf(fg,"%d,",n);
       fprintf(fg,"%s %s ",vec2str(p2,"%.5e,"),vec2str(UVW,"%.5e,"));
       fprintf(fg,"%s %s ",vec2str(c1,"%.5e,"),vec2str(c2,"%.5e,"));
