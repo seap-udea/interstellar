@@ -75,6 +75,8 @@ http://naif.jpl.nasa.gov/pub/naif/
 #define AU GSL_CONST_MKSA_ASTRONOMICAL_UNIT
 #define PARSEC GSL_CONST_MKSA_PARSEC
 #define VESC_EARTH 11.217 //km/s
+#define MAS 1.5915494309189534E-5 //mas -> rad
+
 //////////////////////////////////////////
 //BEHAVIOR
 //////////////////////////////////////////
@@ -1021,7 +1023,7 @@ char *str_replace(char *orig, char *rep, char *with)
 #define MAXCOLS 10000
 #define MAXTEXT 200
 #define MAXLINE 100000
-int parseLine(char* line,char** cols,int *ncols)
+int parseLine(char line[],char** cols,int *ncols)
 {
   char *pt;
   pt=strtok(line,",");
@@ -1620,3 +1622,116 @@ double distancePointLine(double p[],double p1[],double p2[],double *dtfrac)
 
   return dmin;
 }
+
+int generateMultivariate(double** cov,double *mu,double **x,int n,int Nobs)
+{
+  gsl_matrix *C=gsl_matrix_alloc(n,n);
+  gsl_vector *muv=gsl_vector_alloc(n);
+  gsl_vector *xv=gsl_vector_alloc(n);
+
+  for(int i=n;i-->0;){
+    gsl_vector_set(muv,i,mu[i]);
+    for(int j=n;j-->0;)
+      gsl_matrix_set(C,i,j,cov[i][j]);
+  }
+
+  //PREPARE
+  gsl_linalg_cholesky_decomp1(C);
+  
+  //GENERATE
+  for(int i=0;i<Nobs;i++){
+    gsl_ran_multivariate_gaussian(RAND,muv,C,xv);
+    for(int j=n;j-->0;) x[i][j]=gsl_vector_get(xv,j);
+  }
+    
+  //RETURN
+  gsl_matrix_free(C);
+  gsl_vector_free(muv);
+  gsl_vector_free(xv);
+  
+  return 0;
+}
+
+double **matrixAllocate(int n,int m)
+{
+  double **M;
+  
+  M=(double**)malloc(n*sizeof(double*));
+  for(int i=0;i<n;i++) M[i]=(double*)malloc(m*sizeof(double));
+  
+  return M;
+}
+
+double terminalDistance(double t,void *params)
+{
+  double* ps=(double*)params;
+  double **x1=matrixAllocate(2,6),**x2=matrixAllocate(2,6);
+  double* ipars;
+  double ts[2];
+  double h=fabs(t)/100;
+  double dx[6],d,dv;
+  ipars=ps+12;
+
+  copyVec(x1[0],ps,6);
+  copyVec(x2[0],ps+6,6);
+
+  fprintf(stdout,"Attempting to integrate with tint = %.6e\n",t);
+
+  fprintf(stdout,"Initial conditions:\n\t%s\n\t%s\n",
+	  vec2strn(x1[0],6,"%.5e "),vec2strn(x2[0],6,"%.5e "));
+
+  //Integrate star
+  integrateEoM(0,ps,h,2,t,6,EoMGalactic,ipars,ts,x1);
+  fprintf(stdout,"Integration result star: %s\n",vec2strn(x1[1],6,"%.5e "));
+  
+  //Integrate particle
+  integrateEoM(0,ps+6,h,2,t,6,EoMGalactic,ipars,ts,x2);
+  fprintf(stdout,"Integration result particle: %s\n",vec2strn(x2[1],6,"%.5e "));
+
+  //Distance
+  vsubg_c(x1[1],x2[1],6,dx);
+  d=vnorm_c(dx);
+  dv=vnorm_c(dx+3);
+  fprintf(stdout,"Distance = %e, Velocity difference = %e\n",d,dv);
+  
+  exit(0);
+  
+  return 0;
+}
+
+int minDistance(double *xs,double *xp,double mint,double maxt,
+		double *dmin,double *tmin,double *params)
+{
+  int status;
+  double ps[22];
+
+  copyVec(ps,xs,6);
+  copyVec(ps+6,xp,6);
+  copyVec(ps+12,params,10);
+  fprintf(stdout,"Initial conditions:%s\n",vec2strn(ps,12,"%.5e "));
+  fprintf(stdout,"Other parameters:%s\n",vec2strn(ps+12,10,"%.5e "));
+
+  *dmin=terminalDistance(*tmin,ps);
+
+  gsl_function F={.function=&terminalDistance,.params=ps};
+  gsl_min_fminimizer *s=gsl_min_fminimizer_alloc(gsl_min_fminimizer_brent);
+  gsl_min_fminimizer_set(s,&F,*tmin,mint,maxt);
+
+  //MINIMIZE
+  int i=0;
+  do{
+    i++;
+    status=gsl_min_fminimizer_iterate(s);
+    *tmin=gsl_min_fminimizer_x_minimum(s);
+    mint=gsl_min_fminimizer_x_lower(s);
+    maxt=gsl_min_fminimizer_x_upper(s);
+    status=gsl_min_test_interval(mint,maxt,0.0,1e-5);
+    if(status==GSL_SUCCESS)
+      VPRINT(stdout,"Minimization converged\n");
+  }while(status==GSL_CONTINUE && i<100);
+
+  //COMPUTE STATE AT MINIMIZE
+  *dmin=terminalDistance(*tmin,params);
+  return 0;
+}
+

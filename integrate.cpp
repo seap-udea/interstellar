@@ -52,8 +52,8 @@ int main(int argc,char* argv[])
   double *xInt0,**xInt;
   double *tsp,*ts;
   //INITIAL CONDITIONS
-  double *dxIntdt,*x,*xg,*xp1,*xp2,*dx,*x0;
-  double dmin,tmin,ftmin,dyn_tmin,dyn_dmin;
+  double *dxIntdt,*x,*xg,*xp1,*xp2,*xpmin,*dx,*x0;
+  double dmin,tmin,ftmin,dyn_tmin,dyn_dmin,dyn_vrel;
   double G;
   double t;
   int it;
@@ -77,12 +77,13 @@ int main(int argc,char* argv[])
   nsysp=6*Npart;
   nsys=6;
 
-  Ntimesp=100;
+  Ntimesp=10000;
   Ntimes=100;
 
   x=(double*)malloc(6*sizeof(double));//LSR STATE VECTOR
   xg=(double*)malloc(6*sizeof(double));//GC STATE VECTOR
   dx=(double*)malloc(6*sizeof(double));//LSR STATE VECTOR
+  xpmin=(double*)malloc(6*sizeof(double));//GC STATE VECTOR
 
   xIntp0=(double*)malloc(nsysp*sizeof(double));
   xInt0=(double*)malloc(nsys*sizeof(double));
@@ -119,7 +120,11 @@ int main(int argc,char* argv[])
   ////////////////////////////////////////////////////
   //READ PARTICLES POSITION
   ////////////////////////////////////////////////////
-  FILE *fc=fopen("cloud-int.csv","r");
+  FILE *fc;
+  if((fc=fopen("cloud-int.csv","r"))==NULL){
+    fprintf(stdout,"Houston we've got a problem\n");
+    exit(0);
+  }
   fgets(line,MAXLINE,fc);//HEADER
   int i=0;
   while(fgets(line,MAXLINE,fc)!=NULL){
@@ -144,15 +149,20 @@ int main(int argc,char* argv[])
 
   n=0;
   fc=fopen("candidates.csv","r");
+  FILE *fp=fopen("potential.csv","w");
   fgets(line,MAXLINE,fc);//HEADER
+  fprintf(fp,"dyntmin,dyndmin,dynvrel,%s",line);
+  char values[MAXLINE];
   while(fgets(line,MAXLINE,fc)!=NULL){
-
+    
     //PARSE FIELDS
+    strcpy(values,line);
     parseLine(line,fields,&nfields);
     n++;
 
     //if(strcmp(fields[HIP],"40170.0")!=0) continue;
-    //if(strcmp(fields[TYCHO2_ID],"6410-743-1")!=0) continue;
+    //if(strcmp(fields[TYCHO2_ID],"6436-395-1")!=0) continue;
+    //if(strcmp(fields[HIP],"95319.0")!=0) continue;
     fprintf(stdout,"Star %d,%s,%s:\n",n,fields[HIP],fields[TYCHO2_ID]);
 
     //LMA ENCOUNTER TIME
@@ -175,6 +185,8 @@ int main(int argc,char* argv[])
     vscl_c(1e3/UL,xg,xg);//SET UNITS
     vscl_c(1e3/UV,xg+3,xg+3);
     cart2polar(xg,xInt0,1.0);//CONVERSION TO CYLINDRICAL
+    fprintf(stdout,"\tInitial position: %s\n",vec2strn(xInt0,6,"%.5e "));
+    //exit(0);
 
     //INTEGRATE 
     duration+=duration/10;
@@ -218,30 +230,37 @@ int main(int argc,char* argv[])
       tmin=tsp[it]+ftmin*(tsp[it+1]-tsp[it]);
       VPRINT(stdout,"\t\tCorrected time:%e\n",tmin);
 
+      //INTERPOLATED POSITION OF NOMINAL PARTICLE
+      vsubg_c(xp2,xp1,6,dx);
+      vscl_c((tmin-tsp[it])/(tsp[it+1]-tsp[it]),dx,dx);
+      vscl_c((tmin-tsp[it])/(tsp[it+1]-tsp[it]),dx+3,dx+3);
+      vaddg_c(xp1,dx,6,xpmin);
+
+      //DISTANCE TO STAR
+      vsubg_c(xpmin,x,6,dx);
+      VPRINT(stdout,"\t\tDifference at minimum: [%s] (pos:%.5e,vel:%.5e]\n",
+	      vec2strn(dx,6,"%.5e,"),vnorm_c(dx),vnorm_c(dx+3)*UV/1e3);
+
       //COMPUTE MINIMUM DISTANCE
       if(dmin<=dyn_dmin){
 	dyn_dmin=dmin;
 	dyn_tmin=tmin;
+	dyn_vrel=vnorm_c(dx+3)*UV/1e3;
       }
     }
 
     fprintf(stdout,"\tDynamical minimum distance: %e\n",dyn_dmin);
     fprintf(stdout,"\tDynamical minimum time: %e\n",dyn_tmin);
     
-    /*
-    double p2[6];
-    polar2cart(xInt[1],p2,1.0);
-    VPRINT(stdout,"\tFinal position:%s\n",vec2strn(p2,6,"%.5e "));
-
-    double dp[6];
-    vsubg_c(p2,p1,6,dp);
-    VPRINT(stdout,"\tDifference: [%s] (pos:%.5e,vel:%.5e]\n",
-    vec2strn(dp,6,"%.5e "),vnorm_c(dp),vnorm_c(dp+3)*UV);
-    */
-
-    //if(n>10) break;
+    //STORE THE BEST CANDIDATES
+    if(dyn_dmin<2.0){
+      fprintf(fp,"%.5lf,%.5lf,%.5lf,%s",dyn_tmin,dyn_dmin,dyn_vrel,values);
+    }
+    
     //break;
   }
-
+  fclose(fc);
+  fclose(fp);
+    
   return 0;
 }
