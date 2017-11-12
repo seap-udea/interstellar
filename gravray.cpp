@@ -16,7 +16,8 @@ http://naif.jpl.nasa.gov/pub/naif/
 #include <gsl/gsl_math.h>
 #include <gsl/gsl_roots.h>
 #include <gsl/gsl_linalg.h>
-#include <gsl/gsl_multifit_nlin.h>
+#include <gsl/gsl_linalg.h>
+#include <gsl/gsl_integration.h>
 #include <gsl/gsl_min.h>
 #include <gsl/gsl_multimin.h>
 #include <gsl/gsl_vector.h>
@@ -236,10 +237,14 @@ double UL,UM,UT,UV;
 //////////////////////////////////////////
 //ROUTINES
 //////////////////////////////////////////
+void errorGSL(const char * reason,const char * file,int line,int gsl_errno){throw(1);}
 int initSpice(void)
 {
   SpiceInt i,n;
   SpiceDouble radii[3];
+  
+  //INITIALIZE GSL ERROR HANDLER
+  gsl_set_error_handler(&errorGSL); 
 
   //KERNELS
   furnsh_c("kernels.txt");
@@ -265,7 +270,8 @@ int initSpice(void)
 
   //RANDOM NUMBERS
   RAND=gsl_rng_alloc(gsl_rng_default);
-  gsl_rng_set(RAND,time(NULL));
+  //gsl_rng_set(RAND,time(NULL));
+  gsl_rng_set(RAND,3);
 
   return 0;
 }
@@ -1675,47 +1681,62 @@ double terminalDistance(double t,void *params)
   copyVec(x1[0],ps,6);
   copyVec(x2[0],ps+6,6);
 
-  fprintf(stdout,"Attempting to integrate with tint = %.6e\n",t);
+  VPRINT(stdout,"Attempting to integrate with tint = %.6e\n",t);
+  VPRINT(stdout,"Parameters: %s\n",vec2strn(ipars,10,"%.5e "));
 
-  fprintf(stdout,"Initial conditions:\n\t%s\n\t%s\n",
+  VPRINT(stdout,"Initial conditions:\n\t%s\n\t%s\n",
 	  vec2strn(x1[0],6,"%.5e "),vec2strn(x2[0],6,"%.5e "));
 
   //Integrate star
   integrateEoM(0,ps,h,2,t,6,EoMGalactic,ipars,ts,x1);
-  fprintf(stdout,"Integration result star: %s\n",vec2strn(x1[1],6,"%.5e "));
+  VPRINT(stdout,"Integration result star: %s\n",vec2strn(x1[1],6,"%.5e "));
   
   //Integrate particle
   integrateEoM(0,ps+6,h,2,t,6,EoMGalactic,ipars,ts,x2);
-  fprintf(stdout,"Integration result particle: %s\n",vec2strn(x2[1],6,"%.5e "));
+  VPRINT(stdout,"Integration result particle: %s\n",vec2strn(x2[1],6,"%.5e "));
 
   //Distance
   vsubg_c(x1[1],x2[1],6,dx);
   d=vnorm_c(dx);
   dv=vnorm_c(dx+3);
-  fprintf(stdout,"Distance = %e, Velocity difference = %e\n",d,dv);
+  VPRINT(stdout,"Distance = %e, Velocity difference = %e\n",d,dv);
   
-  exit(0);
+  if(VERBOSE) getchar();
   
-  return 0;
+  if((int)ps[22]==1){
+    /*
+    for(int i=6;i-->0;){
+      ps[i]=x1[1][i];
+      ps[6+i]=x2[1][i];
+    }
+    */
+    copyVec(ps,x1[1],6);
+    copyVec(ps+6,x2[1],6);
+  }
+  
+  return d;
 }
 
-int minDistance(double *xs,double *xp,double mint,double maxt,
+int minDistance(double *xs,double *xp,double mint,double maxt,double tmin0,
 		double *dmin,double *tmin,double *params)
 {
   int status;
-  double ps[22];
+  double ps[23];
 
   copyVec(ps,xs,6);
   copyVec(ps+6,xp,6);
   copyVec(ps+12,params,10);
-  fprintf(stdout,"Initial conditions:%s\n",vec2strn(ps,12,"%.5e "));
-  fprintf(stdout,"Other parameters:%s\n",vec2strn(ps+12,10,"%.5e "));
+  //LAST PARAMETERS INSTRUCT THE ROUTINES TO RETURN THE FINAL STATE
+  ps[22]=0.0;
+
+  VPRINT(stdout,"Initial conditions:%s\n",vec2strn(ps,12,"%.5e "));
+  VPRINT(stdout,"Other parameters:%s\n",vec2strn(ps+12,10,"%.5e "));
 
   *dmin=terminalDistance(*tmin,ps);
 
   gsl_function F={.function=&terminalDistance,.params=ps};
   gsl_min_fminimizer *s=gsl_min_fminimizer_alloc(gsl_min_fminimizer_brent);
-  gsl_min_fminimizer_set(s,&F,*tmin,mint,maxt);
+  gsl_min_fminimizer_set(s,&F,tmin0,mint,maxt);
 
   //MINIMIZE
   int i=0;
@@ -1727,11 +1748,151 @@ int minDistance(double *xs,double *xp,double mint,double maxt,
     maxt=gsl_min_fminimizer_x_upper(s);
     status=gsl_min_test_interval(mint,maxt,0.0,1e-5);
     if(status==GSL_SUCCESS)
-      VPRINT(stdout,"Minimization converged\n");
+      VPRINT(stdout,"Minimization converged after %d iterations\n",i);
   }while(status==GSL_CONTINUE && i<100);
 
   //COMPUTE STATE AT MINIMIZE
-  *dmin=terminalDistance(*tmin,params);
+  ps[22]=1;
+  *dmin=terminalDistance(*tmin,ps);
+  VPRINT(stdout,"Final conditions:%s\n",vec2strn(ps,12,"%.5e "));
+  copyVec(xs,ps,6);
+  copyVec(xp,ps+6,6);
+  
   return 0;
 }
 
+/*
+  Use multidimensional minimization methods to avoid guessing
+ */
+double terminalDistance2(const gsl_vector *x,void *params)
+{
+  double t;
+  double* ps=(double*)params;
+  double **x1=matrixAllocate(2,6),**x2=matrixAllocate(2,6);
+  double* ipars;
+  double ts[2];
+  double h;
+  double dx[6],d,dv;
+  ipars=ps+12;
+
+  t=gsl_vector_get(x,0);
+  h=fabs(t)/100;
+  copyVec(x1[0],ps,6);
+  copyVec(x2[0],ps+6,6);
+
+  VPRINT(stdout,"Attempting to integrate with tint = %.6e\n",t);
+  VPRINT(stdout,"Parameters: %s\n",vec2strn(ipars,10,"%.5e "));
+
+  VPRINT(stdout,"Initial conditions:\n\t%s\n\t%s\n",
+	  vec2strn(x1[0],6,"%.5e "),vec2strn(x2[0],6,"%.5e "));
+
+  //Integrate star
+  integrateEoM(0,ps,h,2,t,6,EoMGalactic,ipars,ts,x1);
+  VPRINT(stdout,"Integration result star: %s\n",vec2strn(x1[1],6,"%.5e "));
+  
+  //Integrate particle
+  integrateEoM(0,ps+6,h,2,t,6,EoMGalactic,ipars,ts,x2);
+  VPRINT(stdout,"Integration result particle: %s\n",vec2strn(x2[1],6,"%.5e "));
+
+  //Distance
+  vsubg_c(x1[1],x2[1],6,dx);
+  d=vnorm_c(dx);
+  dv=vnorm_c(dx+3);
+  VPRINT(stdout,"Distance = %e, Velocity difference = %e\n",d,dv);
+  
+  if(VERBOSE) getchar();
+  
+  if((int)ps[22]==1){
+    /*
+    for(int i=6;i-->0;){
+      ps[i]=x1[1][i];
+      ps[6+i]=x2[1][i];
+    }
+    */
+    copyVec(ps,x1[1],6);
+    copyVec(ps+6,x2[1],6);
+  }
+  
+  return d;
+}
+
+int minDistance2(double *xs,double *xp,double tmin0,
+		 double *dmin,double *tmin,double *params)
+{
+  int status;
+  double ps[23];
+  double size;
+  double error=fabs(tmin0)/10;
+  double tolerance=error/10;
+
+  copyVec(ps,xs,6);
+  copyVec(ps+6,xp,6);
+  copyVec(ps+12,params,10);
+  //LAST PARAMETERS INSTRUCT THE ROUTINES TO RETURN THE FINAL STATE
+  ps[22]=0.0;
+
+  VPRINT(stdout,"Initial conditions:%s\n",vec2strn(ps,12,"%.5e "));
+  VPRINT(stdout,"Other parameters:%s\n",vec2strn(ps+12,10,"%.5e "));
+  gsl_multimin_function F;
+  F.n=1;
+  F.f=&terminalDistance2;
+  F.params=ps;
+  gsl_multimin_fminimizer *s=
+    gsl_multimin_fminimizer_alloc(gsl_multimin_fminimizer_nmsimplex2,1);
+  gsl_vector *x=gsl_vector_alloc(1);
+  gsl_vector *dx=gsl_vector_alloc(1);
+  
+  gsl_vector_set(x,0,tmin0);
+  gsl_vector_set_all(dx,fabs(tmin0)/10);
+  gsl_multimin_fminimizer_set(s,&F,x,dx);
+
+  //MINIMIZE
+  int i=0;
+  do{
+    i++;
+    VPRINT(stdout,"Iteration %d\n",i);
+    status=gsl_multimin_fminimizer_iterate(s);
+    if(status) break;
+    size=gsl_multimin_fminimizer_size(s);
+    status=gsl_multimin_test_size(size,tolerance);
+    if(status==GSL_SUCCESS)
+      VPRINT(stdout,"Minimization converged after %d iterations\n",i);
+  }while(status==GSL_CONTINUE && i<100);
+
+  //GET RESULT
+  *tmin=gsl_vector_get(s->x,0);
+  *dmin=s->fval;
+
+  //COMPUTE STATE AT MINIMIZE
+  ps[22]=1;
+  *dmin=terminalDistance(*tmin,ps);
+  VPRINT(stdout,"Final conditions:%s\n",vec2strn(ps,12,"%.5e "));
+  copyVec(xs,ps,6);
+  copyVec(xp,ps+6,6);
+  
+  return 0;
+}
+
+double wFunction(double d,void *params)
+{
+  double h=*(double*)params;
+  double q=d/h;
+  double w;
+  if(q<1)
+    w=0.25*(2-q)*(2-q)*(2-q)-(1-q)*(1-q)*(1-q);
+  else if(q<2)
+    w=0.25*(2-q)*(2-q)*(2-q);
+  else
+    w=0;
+  return w;
+}
+
+double wNormalization(double h)
+{
+  double norm,error;
+  gsl_integration_workspace *w=gsl_integration_workspace_alloc(1000);
+  gsl_function F={.function=&wFunction,.params=&h};
+  gsl_integration_qags(&F,0.0,2*h,0.0,1e-7,1000,w,&norm,&error);
+  fprintf(stdout,"Normalization:%e +/- %e\n",norm,error);
+  return 1/norm;
+}
