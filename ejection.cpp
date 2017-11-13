@@ -224,7 +224,7 @@ int main(int argc,char* argv[])
   double Mp=1.0e-3,logMp;
   double Rp=7e5;//km
 
-  /*
+  //*
   navg=velocityDistribution(Ms,ap,Mp,Rp,&vmean,&vstd);
   fprintf(stdout,"Converge after %d bodies\n",navg);
   fprintf(stdout,"vmean = %e, vstd = %e, ratio = %e\n",vmean,vstd,vstd/vmean);
