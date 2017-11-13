@@ -26,6 +26,7 @@ http://naif.jpl.nasa.gov/pub/naif/
 #include <gsl/gsl_randist.h>
 #include <gsl/gsl_cdf.h>
 #include <gsl/gsl_const_mksa.h>
+#include <gsl/gsl_statistics.h>
 
 //////////////////////////////////////////
 //MACROS
@@ -39,6 +40,7 @@ http://naif.jpl.nasa.gov/pub/naif/
 #define SGN(x) (x<0?-1:+1)
 #define MAX(x,y) (x>y?x:y)
 #define MIN(x,y) (x<y?x:y)
+#define PI M_PI
 
 //////////////////////////////////////////
 //CSPICE CONSTANTS
@@ -270,7 +272,7 @@ int initSpice(void)
 
   //RANDOM NUMBERS
   RAND=gsl_rng_alloc(gsl_rng_default);
-  //gsl_rng_set(RAND,time(NULL));
+  gsl_rng_set(RAND,time(NULL));
   gsl_rng_set(RAND,3);
 
   return 0;
